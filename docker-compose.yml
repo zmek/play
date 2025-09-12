@@ -1,0 +1,11 @@
+
+services:
+  train-app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./public:/app/public:ro  # Mount public folder for live updates
+    environment:
+      - NODE_ENV=development
+    restart: unless-stopped

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+<title>Next Train: Paddington to Tilehurst</title>
+
+<body style="
+    margin:0;
+    min-height:100vh;          /* fallback */
+    min-height:100dvh;         /* mobile-safe */
+    font-family:monospace;
+    background:#fff;
+  ">
+
+    <main style="
+      padding:1em;
+      line-height:1.4;
+      font-size:14px;
+    ">
+        <div style="margin:0 0 6px 0;font-family: 'Courier New', monospace; font-size: 24px; color: #666;">Next train
+            from Paddington to Tilehurst departs in</div>
+
+        <div id="train-display">
+            <div>Loading departure information...</div>
+        </div>
+    </main>
+
+
+    <script>
+        // Auto-start train data fetch and countdown
+        getNextTrain();
+
+        async function getNextTrain() {
+            const display = document.getElementById('train-display');
+
+            // Clear any existing countdown
+            clearCountdown();
+
+            try {
+                const response = await fetch('/api/next-train/PAD/TLH');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.departures && data.departures.length > 0) {
+                    const nextTrain = data.departures[0];
+                    const service = nextTrain.service;
+
+                    display.innerHTML = `
+            <div id="countdown" style="
+              font-family: 'Courier New', monospace;
+              font-size: 120px;
+              font-weight: bold;
+              margin: 20px 0;
+              color: #000;
+              text-align: left;
+              letter-spacing: 4px;
+              min-height: 120px;
+              display: flex;
+              align-items: center;
+              justify-content: flex-start;
+            "></div>
+            <div style="margin: 10px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">From ${service.platform ? `Platform: ${service.platform}` : ''}</div>
+            ${service.isCancelled ? '<div style="color: red; font-weight: bold;">CANCELLED</div>' : ''}
+            ${service.delayReason ? `<div style="color: #666;">Delay reason: ${service.delayReason}</div>` : ''}
+          `;
+
+                    // Start countdown timer
+                    startCountdown(service.std, service.etd);
+                } else {
+                    display.innerHTML = '<div>No trains found for this route.</div>';
+                }
+
+            } catch (error) {
+                console.error('Error fetching train data:', error);
+                display.innerHTML = `
+          Failed to fetch train data: ${error.message}
+          Make sure your server is running on port 3000.
+        `;
+            }
+        }
+
+        function startCountdown(scheduledTime, expectedTime) {
+            const countdownElement = document.getElementById('countdown');
+            if (!countdownElement) return;
+
+            // Use expected time if available, otherwise use scheduled time
+            const targetTime = expectedTime && expectedTime !== 'On time' ? expectedTime : scheduledTime;
+
+            if (!targetTime || targetTime === 'N/A') {
+                countdownElement.innerHTML = '--:--<br><span style="font-size: 24px; color: #666;">Time unavailable</span>';
+                countdownElement.style.color = '#ffaa00';
+                countdownElement.style.textShadow = '0 0 10px #ffaa00';
+                return;
+            }
+
+            function updateCountdown() {
+                const now = new Date();
+                const target = new Date();
+
+                // Parse the time string (assuming format like "14:30" or "2:30 PM")
+                const timeMatch = targetTime.match(/(\d{1,2}):(\d{2})/);
+                if (!timeMatch) {
+                    countdownElement.innerHTML = '--:--<br><span style="font-size: 24px; color: #666;">Invalid time format</span>';
+                    countdownElement.style.color = '#ff0000';
+                    countdownElement.style.textShadow = '0 0 10px #ff0000';
+                    return;
+                }
+
+                let hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+
+                // Handle 12-hour format (if PM and not 12, add 12)
+                if (targetTime.includes('PM') && hours !== 12) {
+                    hours += 12;
+                } else if (targetTime.includes('AM') && hours === 12) {
+                    hours = 0;
+                }
+
+                target.setHours(hours, minutes, 0, 0);
+
+                // If the time has passed today, assume it's for tomorrow
+                if (target <= now) {
+                    target.setDate(target.getDate() + 1);
+                }
+
+                const diff = target - now;
+
+                if (diff <= 0) {
+                    countdownElement.innerHTML = '00:00<br><span style="font-size: 24px; color: #666;">Train departed</span>';
+                    countdownElement.style.color = '#ff0000';
+                    countdownElement.style.textShadow = '0 0 10px #ff0000';
+                    return;
+                }
+
+                const totalMinutes = Math.floor(diff / (1000 * 60));
+                const hoursLeft = Math.floor(totalMinutes / 60);
+                const minutesLeft = totalMinutes % 60;
+
+                if (hoursLeft > 0) {
+                    countdownElement.innerHTML = `${hoursLeft.toString().padStart(2, '0')}:${minutesLeft.toString().padStart(2, '0')}<br><span style="font-size: 24px; color: #666;">hours from now</span>`;
+                } else {
+                    countdownElement.innerHTML = `00:${minutesLeft.toString().padStart(2, '0')}<br><span style="font-size: 24px; color: #666;">hours from now</span>`;
+                }
+            }
+
+            // Update immediately and then every second
+            updateCountdown();
+            const interval = setInterval(updateCountdown, 1000);
+
+            // Store interval ID so we can clear it later
+            countdownElement.dataset.intervalId = interval;
+        }
+
+        function clearCountdown() {
+            const countdownElement = document.getElementById('countdown');
+            if (countdownElement && countdownElement.dataset.intervalId) {
+                clearInterval(countdownElement.dataset.intervalId);
+            }
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(getNextTrain, 30000);
+    </script>
+</body>
+
+</html>
