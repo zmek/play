@@ -6,6 +6,7 @@ services:
       - "3000:3000"
     volumes:
       - ./public:/app/public:ro  # Mount public folder for live updates
+      - ./data:/app/data  # Persist database and other data
     environment:
       - NODE_ENV=development
     restart: unless-stopped
