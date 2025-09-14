@@ -29,6 +29,8 @@
         // Auto-start train data fetch and countdown
         getNextTrain();
 
+        let currentDepartureTime = null;
+
         async function getNextTrain() {
             const display = document.getElementById('train-display');
 
@@ -47,6 +49,9 @@
                 if (data.departures && data.departures.length > 0) {
                     const nextTrain = data.departures[0];
                     const service = nextTrain.service;
+
+                    // Store the departure time for smart refresh calculation
+                    currentDepartureTime = service.etd && service.etd !== 'On time' ? service.etd : service.std;
 
                     display.innerHTML = `
             <div id="countdown" style="
@@ -161,8 +166,55 @@
             }
         }
 
-        // Auto-refresh every 30 seconds
-        setInterval(getNextTrain, 30000);
+
+        // Smart refresh intervals based on time to departure
+        function scheduleNextUpdate() {
+            getNextTrain().then(() => {
+                let nextRefresh = 30 * 1000; // Default fallback
+
+                if (currentDepartureTime) {
+                    // Calculate minutes to departure using the actual departure time
+                    const now = new Date();
+                    const departure = new Date();
+                    const timeMatch = currentDepartureTime.match(/(\d{1,2}):(\d{2})/);
+
+                    if (timeMatch) {
+                        let hours = parseInt(timeMatch[1]);
+                        const minutes = parseInt(timeMatch[2]);
+
+                        // Handle 12-hour format
+                        if (currentDepartureTime.includes('PM') && hours !== 12) {
+                            hours += 12;
+                        } else if (currentDepartureTime.includes('AM') && hours === 12) {
+                            hours = 0;
+                        }
+
+                        departure.setHours(hours, minutes, 0, 0);
+
+                        // If time has passed today, assume tomorrow
+                        if (departure <= now) {
+                            departure.setDate(departure.getDate() + 1);
+                        }
+
+                        const totalMinutes = Math.floor((departure - now) / (1000 * 60));
+
+                        // More frequent updates as departure approaches
+                        if (totalMinutes > 60) {
+                            nextRefresh = 5 * 60 * 1000; // 5 minutes - train is far away
+                        } else if (totalMinutes > 15) {
+                            nextRefresh = 60 * 1000; // 1 minute - getting closer
+                        } else {
+                            nextRefresh = 30 * 1000; // 30 seconds - very close
+                        }
+                    }
+                }
+
+                setTimeout(scheduleNextUpdate, nextRefresh);
+            });
+        }
+
+        // Start the smart refresh cycle
+        scheduleNextUpdate();
     </script>
 </body>
 
