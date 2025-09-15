@@ -17,9 +17,9 @@ app.use(cors());
 app.use(express.static('public'));
 
 // LDBWS API configuration
-// You'll need to replace these with actual values
-const LDBWS_BASE_URL = 'http://localhost/LDBWS'; // Replace with actual API URL
-const LDBWS_TOKEN = 'your-token-here'; // Replace with your actual token
+// Get values from environment variables with fallbacks
+const LDBWS_BASE_URL = process.env.LDBWS_BASE_URL || 'http://localhost';
+const LDBWS_API_KEY = process.env.LDBWS_API_KEY || 'your-api-key-here';
 
 // API endpoint to get next train
 app.get('/api/next-train/:from/:to', async (req, res) => {
@@ -27,13 +27,13 @@ app.get('/api/next-train/:from/:to', async (req, res) => {
     const { from, to } = req.params;
 
     // Make request to LDBWS API
-    const apiUrl = `${LDBWS_BASE_URL}/api/20220120/GetNextDepartures/${from}/${to}`;
+    const apiUrl = `${LDBWS_BASE_URL}/LDBWS/api/20220120/GetDepartureBoard/${from}?numRows=10&filterCrs=${to}&filterType=to&timeOffset=0&timeWindow=120`;
 
     console.log(`Fetching: ${apiUrl}`);
 
     const response = await fetch(apiUrl, {
       headers: {
-        'Authorization': `Basic ${Buffer.from(LDBWS_TOKEN + ':').toString('base64')}`,
+        'x-apikey': LDBWS_API_KEY,
         'Content-Type': 'application/json'
       }
     });

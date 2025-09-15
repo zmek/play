@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test-api": "node test-api.js",
+    "quick-test": "node quick-test.js"
   },
   "dependencies": {
     "express": "^4.18.2",

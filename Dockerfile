@@ -13,6 +13,9 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
+# Create .env file from environment variables if they exist
+RUN touch .env
+
 # Expose port 3000
 EXPOSE 3000
 
