@@ -26,8 +26,8 @@ app.get('/api/next-train/:from/:to', async (req, res) => {
   try {
     const { from, to } = req.params;
 
-    // Make request to LDBWS API
-    const apiUrl = `${LDBWS_BASE_URL}/LDBWS/api/20220120/GetDepartureBoard/${from}?numRows=10&filterCrs=${to}&filterType=to&timeOffset=0&timeWindow=120`;
+    // Make request to LDBWS API - using simple format that works
+    const apiUrl = `${LDBWS_BASE_URL}/LDBWS/api/20220120/GetDepartureBoard/${from}`;
 
     console.log(`Fetching: ${apiUrl}`);
 
@@ -44,23 +44,39 @@ app.get('/api/next-train/:from/:to', async (req, res) => {
 
     const data = await response.json();
 
-    // Store platform data in database if we have departure information
-    if (data.departures && data.departures.length > 0) {
-      data.departures.forEach(departure => {
-        if (departure.service) {
-          trainDB.storeDeparture({
-            departure_time: departure.service.etd && departure.service.etd !== 'On time' ? departure.service.etd : departure.service.std,
-            platform: departure.service.platform,
-            destination: departure.crs || 'Unknown',
-            operator: departure.service.operator,
-            is_cancelled: departure.service.isCancelled || false,
-            delay_reason: departure.service.delayReason
-          });
-        }
+    // Store platform data in database if we have train service information
+    if (data.trainServices && data.trainServices.length > 0) {
+      data.trainServices.forEach(trainService => {
+        trainDB.storeDeparture({
+          departure_time: trainService.etd && trainService.etd !== 'On time' ? trainService.etd : trainService.std,
+          platform: trainService.platform,
+          destination: trainService.destination?.[0]?.locationName || 'Unknown',
+          operator: trainService.operator,
+          is_cancelled: trainService.isCancelled || false,
+          delay_reason: trainService.delayReason
+        });
       });
     }
 
-    res.json(data);
+    // Transform the response to match frontend expectations
+    const transformedData = {
+      departures: data.trainServices ? data.trainServices.map(trainService => ({
+        service: {
+          std: trainService.std,
+          etd: trainService.etd,
+          operator: trainService.operator,
+          platform: trainService.platform,
+          isCancelled: trainService.isCancelled,
+          delayReason: trainService.delayReason
+        },
+        crs: to
+      })) : [],
+      locationName: data.locationName,
+      generatedAt: new Date().toISOString(),
+      mockData: false
+    };
+
+    res.json(transformedData);
 
   } catch (error) {
     console.error('Error fetching train data:', error);
