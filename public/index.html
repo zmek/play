@@ -36,7 +36,7 @@
     ">
         <!-- Static header text - never changes -->
         <div style="margin:0 0 6px 0;font-family: 'Courier New', monospace; font-size: 24px; color: #666;">Next train
-            from Paddington to Tilehurst departs in</div>
+            from Paddington to Tilehurst departs at</div>
 
         <!-- Dynamic content container - populated by JavaScript -->
         <div id="train-display">
@@ -46,18 +46,15 @@
 
 
     <script>
-        // Auto-start train data fetch and countdown
-        getNextTrain();
+        // Global variable to track refresh timer
+        let refreshTimer = null;
 
-        // Global variable to store current departure time for smart refresh calculations
-        let currentDepartureTime = null;
+        // Auto-start train data fetch 
+        getNextTrain();
 
         // Function to get the next train data from the server API endpoint
         async function getNextTrain() {
             const display = document.getElementById('train-display');
-
-            // Clear any existing countdown timer to prevent multiple timers running
-            clearCountdown();
 
             try {
                 // Fetch train data from the server API endpoint
@@ -72,40 +69,40 @@
                 const data = await response.json();
 
                 // Check if we got valid departure data
-                if (data.departures && data.departures.length > 0) {
-                    const nextTrain = data.departures[0];
+                if (data.departure) {
+                    const nextTrain = data.departure;
                     const service = nextTrain.service;
 
-                    // Store the departure time globally for smart refresh calculation
-                    // Use expected time if available and not "On time", otherwise use scheduled time
-                    currentDepartureTime = service.etd && service.etd !== 'On time' ? service.etd : service.std;
+                    // Choose the time to display: expected if provided and not "On time", otherwise scheduled
+                    const departTime = service.etd && service.etd !== 'On time' ? service.etd : service.std;
 
-                    // DYNAMIC HTML GENERATION: Build the complete train display HTML
-                    // This replaces the static "Loading..." text with live train data
+                    // Build simplified display showing the exact departure time (no countdown)
                     display.innerHTML = `
-            <div id="countdown" style="
-              font-family: 'Courier New', monospace;
-              font-size: 120px;
-              font-weight: bold;
-              margin: 20px 0;
-              color: #000;
-              text-align: left;
-              letter-spacing: 4px;
-              min-height: 120px;
-              display: flex;
-              align-items: center;
-              justify-content: flex-start;
-            "></div>
-            <div style="margin: 10px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">From ${service.platform ? `Platform: ${service.platform}` : ''}</div>
-            ${service.isCancelled ? '<div style="color: red; font-weight: bold;">CANCELLED</div>' : ''}
-            ${service.delayReason ? `<div style="color: #666;">Delay reason: ${service.delayReason}</div>` : ''}
-          `;
+                            <div style="
+                            font-family: 'Courier New', monospace;
+                            font-size: 120px;
+                            font-weight: bold;
+                            margin: 20px 0;
+                            color: #000;
+                            text-align: left;
+                            letter-spacing: 4px;
+                            min-height: 120px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: flex-start;
+                            ">${departTime || '--:--'}</div>
+                            <div style="margin: 10px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">${service.platform ? `Platform: ${service.platform}` : ''}</div>
+                            ${service.isCancelled ? '<div style="color: red; font-weight: bold;">CANCELLED</div>' : ''}
+                            ${service.delayReason ? `<div style="color: #666;">Delay reason: ${service.delayReason}</div>` : ''}
+                        `;
 
-                    // Start the real-time countdown timer
-                    startCountdown(service.std, service.etd);
+                    // Schedule next refresh based on how close the departure is
+                    scheduleNextRefresh(departTime);
                 } else {
                     // No trains found - show appropriate message
                     display.innerHTML = '<div>No trains found for this route.</div>';
+                    // Schedule a refresh in 2 minutes when no trains are found
+                    scheduleNextRefresh(null, 2 * 60 * 1000);
                 }
 
             } catch (error) {
@@ -115,148 +112,81 @@
           Failed to fetch train data: ${error.message}
           Make sure your server is running on port 3000.
         `;
+                // Schedule a refresh in 30 seconds on error
+                scheduleNextRefresh(null, 30 * 1000);
             }
         }
 
-        // Function to start the countdown timer
-        function startCountdown(scheduledTime, expectedTime) {
-            const countdownElement = document.getElementById('countdown');
-            if (!countdownElement) return;
+        // Function to schedule the next refresh based on departure time proximity
+        function scheduleNextRefresh(departTime, fixedInterval = null) {
+            // Clear any existing timer
+            if (refreshTimer) {
+                clearTimeout(refreshTimer);
+                refreshTimer = null;
+            }
 
-            // Use expected time if available and not "On time", otherwise use scheduled time
-            const targetTime = expectedTime && expectedTime !== 'On time' ? expectedTime : scheduledTime;
-
-            // Handle missing or invalid departure times
-            if (!targetTime || targetTime === 'N/A') {
-                countdownElement.innerHTML = '--:--<br><span style="font-size: 24px; color: #666;">Time unavailable</span>';
-                countdownElement.style.color = '#ffaa00';
-                countdownElement.style.textShadow = '0 0 10px #ffaa00';
+            // If a fixed interval is provided (for errors or no trains), use that
+            if (fixedInterval) {
+                refreshTimer = setTimeout(getNextTrain, fixedInterval);
                 return;
             }
 
-            // Inner function that calculates and displays the countdown
-            function updateCountdown() {
+            // If no departure time, schedule a refresh in 2 minutes
+            if (!departTime || departTime === '--:--') {
+                refreshTimer = setTimeout(getNextTrain, 2 * 60 * 1000);
+                return;
+            }
+
+            try {
+                // Parse the departure time (format: HH:MM)
+                const [hours, minutes] = departTime.split(':').map(Number);
                 const now = new Date();
-                const target = new Date();
+                const departure = new Date();
+                departure.setHours(hours, minutes, 0, 0);
 
-                // Parse the time string (handles formats like "14:30" or "2:30 PM")
-                const timeMatch = targetTime.match(/(\d{1,2}):(\d{2})/);
-                if (!timeMatch) {
-                    countdownElement.innerHTML = '--:--<br><span style="font-size: 24px; color: #666;">Invalid time format</span>';
-                    countdownElement.style.color = '#ff0000';
-                    countdownElement.style.textShadow = '0 0 10px #ff0000';
-                    return;
+                // If the departure time is in the past, assume it's tomorrow
+                if (departure <= now) {
+                    departure.setDate(departure.getDate() + 1);
                 }
 
-                let hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
+                // Calculate minutes until departure
+                const minutesUntilDeparture = Math.round((departure - now) / (1000 * 60));
 
-                // Handle 12-hour format conversion (if PM and not 12, add 12; if AM and 12, make 0)
-                if (targetTime.includes('PM') && hours !== 12) {
-                    hours += 12;
-                } else if (targetTime.includes('AM') && hours === 12) {
-                    hours = 0;
-                }
+                // Determine refresh interval based on how close the train is
+                let refreshIntervalMs;
 
-                // Set the target departure time for today
-                target.setHours(hours, minutes, 0, 0);
-
-                // If the target time has already passed today, assume it's for tomorrow
-                if (target <= now) {
-                    target.setDate(target.getDate() + 1);
-                }
-
-                // Calculate time difference in milliseconds
-                const diff = target - now;
-
-                // Handle case where train has already departed
-                if (diff <= 0) {
-                    countdownElement.innerHTML = '00:00<br><span style="font-size: 24px; color: #666;">Train departed</span>';
-                    countdownElement.style.color = '#ff0000';
-                    countdownElement.style.textShadow = '0 0 10px #ff0000';
-                    return;
-                }
-
-                // Convert to hours and minutes remaining
-                const totalMinutes = Math.floor(diff / (1000 * 60));
-                const hoursLeft = Math.floor(totalMinutes / 60);
-                const minutesLeft = totalMinutes % 60;
-
-                // Display countdown with proper formatting
-                if (hoursLeft > 0) {
-                    countdownElement.innerHTML = `${hoursLeft.toString().padStart(2, '0')}:${minutesLeft.toString().padStart(2, '0')}<br><span style="font-size: 24px; color: #666;">hours from now</span>`;
+                if (minutesUntilDeparture <= 5) {
+                    // Train departing within 5 minutes - refresh every 30 seconds
+                    refreshIntervalMs = 30 * 1000;
+                } else if (minutesUntilDeparture <= 15) {
+                    // Train departing within 15 minutes - refresh every minute
+                    refreshIntervalMs = 60 * 1000;
+                } else if (minutesUntilDeparture <= 30) {
+                    // Train departing within 30 minutes - refresh every 2 minutes
+                    refreshIntervalMs = 2 * 60 * 1000;
                 } else {
-                    countdownElement.innerHTML = `00:${minutesLeft.toString().padStart(2, '0')}<br><span style="font-size: 24px; color: #666;">hours from now</span>`;
+                    // Train departing in more than 30 minutes - refresh every 5 minutes
+                    refreshIntervalMs = 5 * 60 * 1000;
                 }
-            }
 
-            // Start the countdown: update immediately, then every second
-            updateCountdown();
-            const interval = setInterval(updateCountdown, 1000);
+                refreshTimer = setTimeout(getNextTrain, refreshIntervalMs);
 
-            // Store interval ID in DOM element so we can clear it later when new data arrives
-            countdownElement.dataset.intervalId = interval;
-        }
+                // Optional: Log the refresh schedule for debugging
+                console.log(`Next refresh in ${refreshIntervalMs / 1000}s (train departs in ${minutesUntilDeparture} minutes)`);
 
-        // Function to clear the countdown timer
-        function clearCountdown() {
-            const countdownElement = document.getElementById('countdown');
-            if (countdownElement && countdownElement.dataset.intervalId) {
-                clearInterval(countdownElement.dataset.intervalId);
+            } catch (parseError) {
+                // If we can't parse the departure time, refresh in 2 minutes
+                console.warn('Could not parse departure time, using default refresh interval:', parseError);
+                refreshTimer = setTimeout(getNextTrain, 2 * 60 * 1000);
             }
         }
 
-
-        // Smart refresh intervals based on time to departure
-        function scheduleNextUpdate() {
-            // Fetch new train data, then schedule the next fetch based on how close the train is
-            getNextTrain().then(() => {
-                let nextRefresh = 30 * 1000; // Default fallback (30 seconds)
-
-                // Calculate how long until the next departure to determine refresh frequency
-                if (currentDepartureTime) {
-                    const now = new Date();
-                    const departure = new Date();
-                    const timeMatch = currentDepartureTime.match(/(\d{1,2}):(\d{2})/);
-
-                    if (timeMatch) {
-                        let hours = parseInt(timeMatch[1]);
-                        const minutes = parseInt(timeMatch[2]);
-
-                        // Handle 12-hour format conversion
-                        if (currentDepartureTime.includes('PM') && hours !== 12) {
-                            hours += 12;
-                        } else if (currentDepartureTime.includes('AM') && hours === 12) {
-                            hours = 0;
-                        }
-
-                        departure.setHours(hours, minutes, 0, 0);
-
-                        // If time has passed today, assume tomorrow
-                        if (departure <= now) {
-                            departure.setDate(departure.getDate() + 1);
-                        }
-
-                        const totalMinutes = Math.floor((departure - now) / (1000 * 60));
-
-                        // ADAPTIVE REFRESH RATES: More frequent updates as departure approaches
-                        if (totalMinutes > 60) {
-                            nextRefresh = 10 * 60 * 1000; // 10 minutes - train is far away, less frequent updates
-                        } else if (totalMinutes > 15) {
-                            nextRefresh = 5 * 60 * 1000;  // 5 minutes - getting closer, moderate updates
-                        } else {
-                            nextRefresh = 30 * 1000;      // 30 seconds - very close, frequent updates
-                        }
-                    }
-                }
-
-                // Schedule the next data fetch using the calculated interval
-                setTimeout(scheduleNextUpdate, nextRefresh);
-            });
-        }
-
-        // Start the smart refresh cycle
-        scheduleNextUpdate();
+        // Clean up timer when page is unloaded
+        window.addEventListener('beforeunload', function () {
+            if (refreshTimer) {
+                clearTimeout(refreshTimer);
+            }
+        });
     </script>
 </body>
 

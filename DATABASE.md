@@ -87,23 +87,11 @@ The database file will be persisted in the `./data` directory.
 curl http://localhost:3000/api/departures/recent?limit=5
 ```
 
-### Get departures from platform 4
-```bash
-curl http://localhost:3000/api/departures/platform/4
-```
-
-### Get platform statistics
-```bash
-curl http://localhost:3000/api/platforms/stats
-```
-
 ## Database Class Methods
 
 The `TrainDatabase` class provides the following methods:
 
 - `storeDeparture(departureData)` - Store or update a departure record
 - `getRecentDepartures(limit)` - Get recent departures
-- `getDeparturesByPlatform(platform)` - Get departures by platform
-- `getPlatformStats()` - Get platform usage statistics
 - `cleanupOldRecords()` - Remove records older than 3 months
 - `close()` - Close database connection

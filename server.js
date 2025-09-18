@@ -52,31 +52,30 @@ app.get('/api/next-train/:from/:to', async (req, res) => {
     // Parse the response body as JSON.
     const data = await response.json();
 
-    // Expect GetNextDepartures shape: { departures: [...], locationName?: string }
-    // If the response body is an array, use it as the departures array. Otherwise, create an empty array.
-    const departures = Array.isArray(data.departures) ? data.departures : [];
+    // Expect GetNextDepartures shape: { departure: {...}, locationName?: string }
+    const departure = data.departure || data.departures?.[0] || null;
 
-    // Persist to database
-    // For each departure, store the departure information in the database.
-    departures.forEach(dep => {
-      const svc = dep.service;
-      if (!svc) return;
-      // Store the departure information in the database.
-      trainDB.storeDeparture({
-        departure_time: svc.etd && svc.etd !== 'On time' ? svc.etd : svc.std,
-        platform: svc.platform,
-        destination: dep.crs || 'Unknown',
-        operator: svc.operator,
-        is_cancelled: svc.isCancelled || false,
-        delay_reason: svc.delayReason
-      });
-    });
+    // Store the departure information in the database.
+    if (departure) {
+      const svc = departure.service;
+      if (svc) {
+        // Store the departure information in the database.
+        trainDB.storeDeparture({
+          departure_time: svc.etd && svc.etd !== 'On time' ? svc.etd : svc.std,
+          platform: svc.platform,
+          destination: departure.crs || 'Unknown',
+          operator: svc.operator,
+          is_cancelled: svc.isCancelled || false,
+          delay_reason: svc.delayReason
+        });
+      }
+    }
 
     // Respond to the frontend request for next train information
-    // by sending a JSON object containing departures, location name, and timestamp.
-    // This provides the frontend with the data it needs to display train departures.
+    // by sending a JSON object containing the single departure, location name, and timestamp.
+    // This provides the frontend with the data it needs to display the next train departure.
     res.json({
-      departures,
+      departure,
       locationName: data.locationName || from,
       generatedAt: new Date().toISOString()
     });
