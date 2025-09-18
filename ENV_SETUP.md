@@ -11,6 +11,10 @@ Create a `.env` file in the project root with your actual values:
 LDBWS_API_KEY=your-actual-api-key-here
 LDBWS_BASE_URL=http://your-ldbws-server
 
+# GetNextDepartures (optional separate credentials)
+NEXTDEPS_API_KEY=your-nextdeps-api-key
+NEXTDEPS_BASE_URL=http://your-nextdeps-server
+
 # Application Configuration
 NODE_ENV=development
 PORT=3000
@@ -21,6 +25,8 @@ PORT=3000
 ```bash
 export LDBWS_API_KEY=your-actual-api-key-here
 export LDBWS_BASE_URL=http://your-ldbws-server
+export NEXTDEPS_API_KEY=your-nextdeps-api-key
+export NEXTDEPS_BASE_URL=http://your-nextdeps-server
 ```
 
 ## Option 3: Use Docker Compose

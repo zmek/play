@@ -20,20 +20,23 @@ app.use(express.static('public'));
 // Get values from environment variables with fallbacks
 const LDBWS_BASE_URL = process.env.LDBWS_BASE_URL || 'http://localhost';
 const LDBWS_API_KEY = process.env.LDBWS_API_KEY || 'your-api-key-here';
+// Separate credentials for GetNextDepartures (if provided)
+const NEXTDEPS_BASE_URL = process.env.NEXTDEPS_BASE_URL || 'http://localhost';
+const NEXTDEPS_API_KEY = process.env.NEXTDEPS_API_KEY || 'your-api-key-here';
 
 // API endpoint to get next train
 app.get('/api/next-train/:from/:to', async (req, res) => {
   try {
     const { from, to } = req.params;
 
-    // Make request to LDBWS API - using simple format that works
-    const apiUrl = `${LDBWS_BASE_URL}/LDBWS/api/20220120/GetDepartureBoard/${from}`;
+    // Use GetNextDepartures endpoint per specification
+    const apiUrl = `${NEXTDEPS_BASE_URL}/LDBWS/api/20220120/GetNextDepartures/${from}/${to}?timeOffset=0&timeWindow=120`;
 
     console.log(`Fetching: ${apiUrl}`);
 
     const response = await fetch(apiUrl, {
       headers: {
-        'x-apikey': LDBWS_API_KEY,
+        'x-apikey': NEXTDEPS_API_KEY,
         'Content-Type': 'application/json'
       }
     });
@@ -44,39 +47,30 @@ app.get('/api/next-train/:from/:to', async (req, res) => {
 
     const data = await response.json();
 
-    // Store platform data in database if we have train service information
-    if (data.trainServices && data.trainServices.length > 0) {
-      data.trainServices.forEach(trainService => {
-        trainDB.storeDeparture({
-          departure_time: trainService.etd && trainService.etd !== 'On time' ? trainService.etd : trainService.std,
-          platform: trainService.platform,
-          destination: trainService.destination?.[0]?.locationName || 'Unknown',
-          operator: trainService.operator,
-          is_cancelled: trainService.isCancelled || false,
-          delay_reason: trainService.delayReason
-        });
-      });
-    }
+    // Expect GetNextDepartures shape: { departures: [...], locationName?: string }
+    const departures = Array.isArray(data.departures) ? data.departures : [];
 
-    // Transform the response to match frontend expectations
-    const transformedData = {
-      departures: data.trainServices ? data.trainServices.map(trainService => ({
-        service: {
-          std: trainService.std,
-          etd: trainService.etd,
-          operator: trainService.operator,
-          platform: trainService.platform,
-          isCancelled: trainService.isCancelled,
-          delayReason: trainService.delayReason
-        },
-        crs: to
-      })) : [],
-      locationName: data.locationName,
+    // Persist to database
+    departures.forEach(dep => {
+      const svc = dep.service;
+      if (!svc) return;
+      trainDB.storeDeparture({
+        departure_time: svc.etd && svc.etd !== 'On time' ? svc.etd : svc.std,
+        platform: svc.platform,
+        destination: dep.crs || 'Unknown',
+        operator: svc.operator,
+        is_cancelled: svc.isCancelled || false,
+        delay_reason: svc.delayReason
+      });
+    });
+
+    // Respond with simplified, consistent shape
+    res.json({
+      departures,
+      locationName: data.locationName || from,
       generatedAt: new Date().toISOString(),
       mockData: false
-    };
-
-    res.json(transformedData);
+    });
 
   } catch (error) {
     console.error('Error fetching train data:', error);

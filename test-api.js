@@ -1,8 +1,10 @@
 const fetch = require('node-fetch');
 
-// Configuration - same as server.js
+// Configuration - prefer GetNextDepartures credentials if provided
 const LDBWS_BASE_URL = process.env.LDBWS_BASE_URL || 'http://localhost';
 const LDBWS_API_KEY = process.env.LDBWS_API_KEY || 'your-api-key-here';
+const NEXTDEPS_BASE_URL = process.env.NEXTDEPS_BASE_URL || 'http://localhost';
+const NEXTDEPS_API_KEY = process.env.NEXTDEPS_API_KEY || 'your-api-key-here';
 
 // Test parameters
 const FROM_STATION = 'PAD'; // Paddington
@@ -12,11 +14,11 @@ async function testAPI() {
     console.log('🚂 Testing LDBWS API Connection...\n');
 
     // Build the API URL
-    const apiUrl = `${LDBWS_BASE_URL}/LDBWS/api/20220120/GetNextDepartures/${FROM_STATION}/${TO_STATION}?timeOffset=0&timeWindow=120`;
+    const apiUrl = `${NEXTDEPS_BASE_URL}/LDBWS/api/20220120/GetNextDepartures/${FROM_STATION}/${TO_STATION}?timeOffset=0&timeWindow=120`;
 
     console.log('📋 Test Configuration:');
-    console.log(`   Base URL: ${LDBWS_BASE_URL}`);
-    console.log(`   API Key: ${LDBWS_API_KEY.substring(0, 8)}...`);
+    console.log(`   Base URL: ${NEXTDEPS_BASE_URL}`);
+    console.log(`   API Key: ${NEXTDEPS_API_KEY.substring(0, 8)}...`);
     console.log(`   From Station: ${FROM_STATION} (Paddington)`);
     console.log(`   To Station: ${TO_STATION} (Tilehurst)`);
     console.log(`   Full URL: ${apiUrl}\n`);
@@ -26,7 +28,7 @@ async function testAPI() {
 
         const response = await fetch(apiUrl, {
             headers: {
-                'x-apikey': LDBWS_API_KEY,
+                'x-apikey': NEXTDEPS_API_KEY,
                 'Content-Type': 'application/json'
             }
         });

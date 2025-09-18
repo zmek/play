@@ -2,6 +2,8 @@ const fetch = require('node-fetch');
 
 const LDBWS_BASE_URL = process.env.LDBWS_BASE_URL || 'https://api1.raildata.org.uk';
 const LDBWS_API_KEY = process.env.LDBWS_API_KEY || 'your-api-key-here';
+const NEXTDEPS_BASE_URL = process.env.NEXTDEPS_BASE_URL || 'https://api1.raildata.org.uk';
+const NEXTDEPS_API_KEY = process.env.NEXTDEPS_API_KEY || 'your-api-key-here';
 
 async function testUrl(url, description) {
     try {
@@ -10,7 +12,7 @@ async function testUrl(url, description) {
 
         const response = await fetch(url, {
             headers: {
-                'x-apikey': LDBWS_API_KEY,
+                'x-apikey': NEXTDEPS_API_KEY,
                 'Content-Type': 'application/json'
             }
         });
@@ -34,25 +36,26 @@ async function testUrl(url, description) {
 async function testAllUrls() {
     console.log('🔍 Testing different URL patterns...');
 
+    const base = NEXTDEPS_BASE_URL;
     const urls = [
         {
-            url: `${LDBWS_BASE_URL}/LDBWS/api/20220120/GetNextDepartures/PAD/TLH?timeOffset=0&timeWindow=120`,
+            url: `${base}/LDBWS/api/20220120/GetNextDepartures/PAD/TLH?timeOffset=0&timeWindow=120`,
             desc: 'Original OpenAPI spec pattern'
         },
         {
-            url: `${LDBWS_BASE_URL}/api/20220120/GetNextDepartures/PAD/TLH?timeOffset=0&timeWindow=120`,
+            url: `${base}/api/20220120/GetNextDepartures/PAD/TLH?timeOffset=0&timeWindow=120`,
             desc: 'Without /LDBWS prefix'
         },
         {
-            url: `${LDBWS_BASE_URL}/GetNextDepartures/PAD/TLH?timeOffset=0&timeWindow=120`,
+            url: `${base}/GetNextDepartures/PAD/TLH?timeOffset=0&timeWindow=120`,
             desc: 'Direct endpoint'
         },
         {
-            url: `${LDBWS_BASE_URL}/api/GetNextDepartures/PAD/TLH?timeOffset=0&timeWindow=120`,
+            url: `${base}/api/GetNextDepartures/PAD/TLH?timeOffset=0&timeWindow=120`,
             desc: 'Simple /api prefix'
         },
         {
-            url: `${LDBWS_BASE_URL}/20220120/GetNextDepartures/PAD/TLH?timeOffset=0&timeWindow=120`,
+            url: `${base}/20220120/GetNextDepartures/PAD/TLH?timeOffset=0&timeWindow=120`,
             desc: 'Version only'
         }
     ];

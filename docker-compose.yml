@@ -11,5 +11,7 @@ services:
       - NODE_ENV=development
       - LDBWS_API_KEY=${LDBWS_API_KEY:-your-api-key-here}
       - LDBWS_BASE_URL=${LDBWS_BASE_URL:-https://api1.raildata.org.uk/1010-live-departure-board-dep1_2}
+      - NEXTDEPS_API_KEY=${NEXTDEPS_API_KEY:-your-nextdeps-api-key}
+      - NEXTDEPS_BASE_URL=${NEXTDEPS_BASE_URL:-https://api1.raildata.org.uk/1010-live-departure-board-dep1_2}
       - PORT=3000
     restart: unless-stopped
