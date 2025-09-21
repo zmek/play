@@ -16,6 +16,12 @@ primary_region = 'lhr'
   min_machines_running = 0
   processes = ['app']
 
+[env]
+LDBWS_BASE_URL = "https://api1.raildata.org.uk/1010-live-departure-board-dep1_2"
+NEXTDEPS_BASE_URL = "https://api1.raildata.org.uk/1010-live-departure-board-dep1_2"
+NODE_ENV = "production"
+PORT = "3000"
+
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
