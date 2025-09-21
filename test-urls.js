@@ -1,8 +1,8 @@
 const fetch = require('node-fetch');
 
-const LDBWS_BASE_URL = process.env.LDBWS_BASE_URL || 'https://api1.raildata.org.uk';
+const LDBWS_BASE_URL = process.env.LDBWS_BASE_URL || 'https://api1.raildata.org.uk/1010-live-departure-board-dep1_2';
 const LDBWS_API_KEY = process.env.LDBWS_API_KEY || 'your-api-key-here';
-const NEXTDEPS_BASE_URL = process.env.NEXTDEPS_BASE_URL || 'https://api1.raildata.org.uk';
+const NEXTDEPS_BASE_URL = process.env.NEXTDEPS_BASE_URL || 'https://api1.raildata.org.uk/1010-live-next-departure-board1_1';
 const NEXTDEPS_API_KEY = process.env.NEXTDEPS_API_KEY || 'your-api-key-here';
 
 async function testUrl(url, description) {
