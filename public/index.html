@@ -68,8 +68,8 @@
                 // Parse the JSON response from the server
                 const data = await response.json();
 
-                // Check if we got valid departure data
-                if (data.departure) {
+                // Check if we got valid departure data with service information
+                if (data.departure && data.departure.service) {
                     const nextTrain = data.departure;
                     const service = nextTrain.service;
 
@@ -100,9 +100,21 @@
                     scheduleNextRefresh(departTime);
                 } else {
                     // No trains found - show appropriate message
-                    display.innerHTML = '<div>No trains found for this route.</div>';
-                    // Schedule a refresh in 2 minutes when no trains are found
-                    scheduleNextRefresh(null, 2 * 60 * 1000);
+                    display.innerHTML = `
+                        <div style="
+                            font-family: 'Courier New', monospace;
+                            font-size: 48px;
+                            font-weight: bold;
+                            text-align: center;
+                            color: #666;
+                            padding: 2em;
+                        ">
+                            No trains found.<br>
+                            <span style="font-size: 24px;">Trying again in one hour.</span>
+                        </div>
+                    `;
+                    // Schedule a refresh in 1 hour when no trains are found
+                    scheduleNextRefresh(null, 60 * 60 * 1000);
                 }
 
             } catch (error) {
@@ -131,9 +143,9 @@
                 return;
             }
 
-            // If no departure time, schedule a refresh in 2 minutes
+            // If no departure time, schedule a refresh in 1 hour
             if (!departTime || departTime === '--:--') {
-                refreshTimer = setTimeout(getNextTrain, 2 * 60 * 1000);
+                refreshTimer = setTimeout(getNextTrain, 60 * 60 * 1000);
                 return;
             }
 

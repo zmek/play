@@ -56,19 +56,17 @@ app.get('/api/next-train/:from/:to', async (req, res) => {
     const departure = data.departure || data.departures?.[0] || null;
 
     // Store the departure information in the database.
-    if (departure) {
+    if (departure && departure.service) {
       const svc = departure.service;
-      if (svc) {
-        // Store the departure information in the database.
-        trainDB.storeDeparture({
-          departure_time: svc.etd && svc.etd !== 'On time' ? svc.etd : svc.std,
-          platform: svc.platform,
-          destination: departure.crs || 'Unknown',
-          operator: svc.operator,
-          is_cancelled: svc.isCancelled || false,
-          delay_reason: svc.delayReason
-        });
-      }
+      // Store the departure information in the database.
+      trainDB.storeDeparture({
+        departure_time: svc.etd && svc.etd !== 'On time' ? svc.etd : svc.std,
+        platform: svc.platform,
+        destination: departure.crs || 'Unknown',
+        operator: svc.operator,
+        is_cancelled: svc.isCancelled || false,
+        delay_reason: svc.delayReason
+      });
     }
 
     // Respond to the frontend request for next train information
