@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+<title>Next Train: Paddington to Tilehurst</title>
+
+<!-- 
+    CURRENT IMPLEMENTATION: Client-Side Dynamic HTML Generation
+    
+    This is a Single Page Application (SPA) approach where:
+    1. The HTML provides only the basic structure and styling
+    2. All train data fetching and display happens via JavaScript
+    3. The page dynamically updates without full page reloads
+    4. Real-time countdown timer runs in the browser
+    5. Smart refresh intervals based on how close the train is
+    
+    ARCHITECTURE:
+    - Static HTML container with minimal content
+    - JavaScript fetches data from /api/next-train/PAD/TLH endpoint
+    - DOM manipulation updates the display with fresh train data
+    - setInterval() runs countdown timer every second
+    - setTimeout() schedules next data refresh based on departure proximity
+-->
+
+<body style="
+    margin:0;
+    min-height:100vh;          /* fallback */
+    min-height:100dvh;         /* mobile-safe */
+    font-family:monospace;
+    background:#fff;
+  ">
+
+    <main style="
+      padding:1em;
+      line-height:1.4;
+      font-size:14px;
+    ">
+        <!-- Static header text - never changes -->
+        <div style="margin:0 0 6px 0;font-family: 'Courier New', monospace; font-size: 24px; color: #666;">Next train
+            from Paddington to Tilehurst departs at</div>
+
+        <!-- Dynamic content container - populated by JavaScript -->
+        <div id="train-display">
+            <div>Loading departure information...</div>
+        </div>
+    </main>
+
+
+    <script>
+        // Global variable to track refresh timer
+        let refreshTimer = null;
+
+        // Auto-start train data fetch 
+        getNextTrain();
+
+        // Function to get the next train data from the server API endpoint
+        async function getNextTrain() {
+            const display = document.getElementById('train-display');
+
+            try {
+                // Fetch train data from the server API endpoint
+                // This makes an HTTP request to the Express server running on port 3000
+                const response = await fetch('/api/next-train/PAD/TLH');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // Parse the JSON response from the server
+                const data = await response.json();
+
+                // Check if we got valid departure data
+                if (data.departure) {
+                    const nextTrain = data.departure;
+                    const service = nextTrain.service;
+
+                    // Choose the time to display: expected if provided and not "On time", otherwise scheduled
+                    const departTime = service.etd && service.etd !== 'On time' ? service.etd : service.std;
+
+                    // Build simplified display showing the exact departure time (no countdown)
+                    display.innerHTML = `
+                            <div style="
+                            font-family: 'Courier New', monospace;
+                            font-size: 120px;
+                            font-weight: bold;
+                            margin: 20px 0;
+                            color: #000;
+                            text-align: left;
+                            letter-spacing: 4px;
+                            min-height: 120px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: flex-start;
+                            ">${departTime || '--:--'}</div>
+                            <div style="margin: 10px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">${service.platform ? `Platform: ${service.platform}` : ''}</div>
+                            ${service.isCancelled ? '<div style="color: red; font-weight: bold;">CANCELLED</div>' : ''}
+                            ${service.delayReason ? `<div style="color: #666;">Delay reason: ${service.delayReason}</div>` : ''}
+                        `;
+
+                    // Schedule next refresh based on how close the departure is
+                    scheduleNextRefresh(departTime);
+                } else {
+                    // No trains found - show appropriate message
+                    display.innerHTML = '<div>No trains found for this route.</div>';
+                    // Schedule a refresh in 2 minutes when no trains are found
+                    scheduleNextRefresh(null, 2 * 60 * 1000);
+                }
+
+            } catch (error) {
+                // Error handling: Show error message if API call fails
+                console.error('Error fetching train data:', error);
+                display.innerHTML = `
+          Failed to fetch train data: ${error.message}
+          Make sure your server is running on port 3000.
+        `;
+                // Schedule a refresh in 30 seconds on error
+                scheduleNextRefresh(null, 30 * 1000);
+            }
+        }
+
+        // Function to schedule the next refresh based on departure time proximity
+        function scheduleNextRefresh(departTime, fixedInterval = null) {
+            // Clear any existing timer
+            if (refreshTimer) {
+                clearTimeout(refreshTimer);
+                refreshTimer = null;
+            }
+
+            // If a fixed interval is provided (for errors or no trains), use that
+            if (fixedInterval) {
+                refreshTimer = setTimeout(getNextTrain, fixedInterval);
+                return;
+            }
+
+            // If no departure time, schedule a refresh in 2 minutes
+            if (!departTime || departTime === '--:--') {
+                refreshTimer = setTimeout(getNextTrain, 2 * 60 * 1000);
+                return;
+            }
+
+            try {
+                // Parse the departure time (format: HH:MM)
+                const [hours, minutes] = departTime.split(':').map(Number);
+                const now = new Date();
+                const departure = new Date();
+                departure.setHours(hours, minutes, 0, 0);
+
+                // If the departure time is in the past, assume it's tomorrow
+                if (departure <= now) {
+                    departure.setDate(departure.getDate() + 1);
+                }
+
+                // Calculate minutes until departure
+                const minutesUntilDeparture = Math.round((departure - now) / (1000 * 60));
+
+                // Determine refresh interval based on how close the train is
+                let refreshIntervalMs;
+
+                if (minutesUntilDeparture <= 5) {
+                    // Train departing within 5 minutes - refresh every 30 seconds
+                    refreshIntervalMs = 30 * 1000;
+                } else if (minutesUntilDeparture <= 15) {
+                    // Train departing within 15 minutes - refresh every minute
+                    refreshIntervalMs = 60 * 1000;
+                } else if (minutesUntilDeparture <= 30) {
+                    // Train departing within 30 minutes - refresh every 2 minutes
+                    refreshIntervalMs = 2 * 60 * 1000;
+                } else {
+                    // Train departing in more than 30 minutes - refresh every 5 minutes
+                    refreshIntervalMs = 5 * 60 * 1000;
+                }
+
+                refreshTimer = setTimeout(getNextTrain, refreshIntervalMs);
+
+                // Optional: Log the refresh schedule for debugging
+                console.log(`Next refresh in ${refreshIntervalMs / 1000}s (train departs in ${minutesUntilDeparture} minutes)`);
+
+            } catch (parseError) {
+                // If we can't parse the departure time, refresh in 2 minutes
+                console.warn('Could not parse departure time, using default refresh interval:', parseError);
+                refreshTimer = setTimeout(getNextTrain, 2 * 60 * 1000);
+            }
+        }
+
+        // Clean up timer when page is unloaded
+        window.addEventListener('beforeunload', function () {
+            if (refreshTimer) {
+                clearTimeout(refreshTimer);
+            }
+        });
+    </script>
+</body>
+
+</html>
