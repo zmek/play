@@ -1,9 +1,9 @@
 const fetch = require('node-fetch');
 
 // Configuration - prefer GetNextDepartures credentials if provided
-const LDBWS_BASE_URL = process.env.LDBWS_BASE_URL || 'http://localhost';
+const LDBWS_BASE_URL = process.env.LDBWS_BASE_URL || 'https://api1.raildata.org.uk/1010-live-departure-board-dep1_2';
 const LDBWS_API_KEY = process.env.LDBWS_API_KEY || 'your-api-key-here';
-const NEXTDEPS_BASE_URL = process.env.NEXTDEPS_BASE_URL || 'http://localhost';
+const NEXTDEPS_BASE_URL = process.env.NEXTDEPS_BASE_URL || 'https://api1.raildata.org.uk/1010-live-next-departure-board1_1';
 const NEXTDEPS_API_KEY = process.env.NEXTDEPS_API_KEY || 'your-api-key-here';
 
 // Test parameters
