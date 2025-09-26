@@ -59,7 +59,14 @@ app.get('/api/next-train/:from/:to', async (req, res) => {
     if (departure && departure.service) {
       const svc = departure.service;
       // Store the departure information in the database.
+      const now = new Date();
+      const service_date = now.toISOString().slice(0, 10); // YYYY-MM-DD
+      const day_of_week = now.toLocaleDateString('en-GB', { weekday: 'long' });
       trainDB.storeDeparture({
+        service_date,
+        day_of_week,
+        std: svc.std,
+        etd: svc.etd && svc.etd !== 'On time' ? svc.etd : null,
         departure_time: svc.etd && svc.etd !== 'On time' ? svc.etd : svc.std,
         platform: svc.platform,
         destination: departure.crs || 'Unknown',

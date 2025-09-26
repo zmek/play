@@ -140,12 +140,17 @@
             // If a fixed interval is provided (for errors or no trains), use that
             if (fixedInterval) {
                 refreshTimer = setTimeout(getNextTrain, fixedInterval);
+                const scheduledAt = new Date(Date.now() + fixedInterval);
+                console.log(`Next refresh at ${scheduledAt.toLocaleTimeString()} (in ${Math.round(fixedInterval / 1000)}s)`);
                 return;
             }
 
             // If no departure time, schedule a refresh in 1 hour
             if (!departTime || departTime === '--:--') {
-                refreshTimer = setTimeout(getNextTrain, 60 * 60 * 1000);
+                const interval = 60 * 60 * 1000;
+                refreshTimer = setTimeout(getNextTrain, interval);
+                const scheduledAt = new Date(Date.now() + interval);
+                console.log(`Next refresh at ${scheduledAt.toLocaleTimeString()} (in ${Math.round(interval / 1000)}s) due to missing departTime`);
                 return;
             }
 
@@ -183,13 +188,17 @@
 
                 refreshTimer = setTimeout(getNextTrain, refreshIntervalMs);
 
-                // Optional: Log the refresh schedule for debugging
-                console.log(`Next refresh in ${refreshIntervalMs / 1000}s (train departs in ${minutesUntilDeparture} minutes)`);
+                // Log the exact time the next refresh is scheduled
+                const scheduledAt = new Date(Date.now() + refreshIntervalMs);
+                console.log(`Next refresh at ${scheduledAt.toLocaleTimeString()} (in ${Math.round(refreshIntervalMs / 1000)}s, train departs in ${minutesUntilDeparture} minutes)`);
 
             } catch (parseError) {
                 // If we can't parse the departure time, refresh in 2 minutes
                 console.warn('Could not parse departure time, using default refresh interval:', parseError);
-                refreshTimer = setTimeout(getNextTrain, 2 * 60 * 1000);
+                const interval = 2 * 60 * 1000;
+                refreshTimer = setTimeout(getNextTrain, interval);
+                const scheduledAt = new Date(Date.now() + interval);
+                console.log(`Next refresh at ${scheduledAt.toLocaleTimeString()} (in ${Math.round(interval / 1000)}s) due to parse error`);
             }
         }
 
