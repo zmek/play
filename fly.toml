@@ -9,12 +9,20 @@ primary_region = 'lhr'
 [build]
 
 [http_service]
-  internal_port = 3000
-  force_https = true
-  auto_stop_machines = 'stop'
-  auto_start_machines = true
-  min_machines_running = 0
-  processes = ['app']
+auto_start_machines = true
+auto_stop_machines = 'stop'
+force_https = true
+internal_port = 3000
+min_machines_running = 0
+processes = ['app']
+
+[[http_service.checks]]
+grace_period = '5s'
+interval = '10s'
+method = 'get'
+path = '/api/health'
+protocol = 'http'
+timeout = '2s'
 
 [env]
 LDBWS_BASE_URL = "https://api1.raildata.org.uk/1010-live-departure-board-dep1_2"
@@ -23,7 +31,11 @@ NODE_ENV = "production"
 PORT = "3000"
 
 [[vm]]
-  memory = '1gb'
-  cpu_kind = 'shared'
-  cpus = 1
-  memory_mb = 1024
+cpu_kind = 'shared'
+cpus = 1
+memory = '1gb'
+memory_mb = 1024
+
+[[mounts]]
+destination = "/app/data"
+source = "data"

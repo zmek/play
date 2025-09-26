@@ -4,8 +4,11 @@ const fs = require('fs');
 
 class TrainDatabase {
   constructor() {
-    // Create database file in the data directory (for Docker persistence)
-    const dataDir = path.join(__dirname, 'data');
+    // Decide on a writable data directory with persistence when available
+    // Priority: explicit DATA_DIR env → Fly volume mount at /data → local ./data
+    let dataDir = process.env.DATA_DIR && process.env.DATA_DIR.trim()
+      ? process.env.DATA_DIR.trim()
+      : (fs.existsSync('/data') ? '/data' : path.join(__dirname, 'data'));
 
     // Ensure data directory exists
     if (!fs.existsSync(dataDir)) {
@@ -22,7 +25,11 @@ class TrainDatabase {
     const createTable = `
       CREATE TABLE IF NOT EXISTS train_departures (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        service_date DATE NOT NULL,
+        day_of_week TEXT,
         departure_time TEXT NOT NULL,
+        std TEXT,
+        etd TEXT,
         platform TEXT,
         destination TEXT NOT NULL,
         operator TEXT,
@@ -35,46 +42,103 @@ class TrainDatabase {
 
     this.db.exec(createTable);
 
-    // Create index for faster queries
+    // Backfill schema for older databases that may not have new columns
+    // SQLite does not support IF NOT EXISTS on ADD COLUMN, so ignore errors if column exists
+    const tryAddColumn = (sql) => {
+      try {
+        this.db.exec(sql);
+      } catch (e) {
+        // ignore
+      }
+    };
+    tryAddColumn("ALTER TABLE train_departures ADD COLUMN std TEXT");
+    tryAddColumn("ALTER TABLE train_departures ADD COLUMN etd TEXT");
+
+    // Create indexes for faster queries
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_departure_time 
       ON train_departures(departure_time)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_service_date_time
+      ON train_departures(service_date, departure_time)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_service_identity
+      ON train_departures(service_date, destination, std)
     `);
 
     console.log('Database initialized successfully');
   }
 
-  // Store or update a train departure
+  // Append-only store of a train departure snapshot
+  // Identifies a logical service by (service_date, std, destination)
+  // Inserts a new row only when any tracked field changes; otherwise skips
   storeDeparture(departureData) {
-    const { departure_time, platform, destination, operator, is_cancelled, delay_reason } = departureData;
+    const { std, etd, departure_time, platform, destination, operator, is_cancelled, delay_reason } = departureData;
+
+    // Derive service_date and day_of_week if not provided
+    let { service_date, day_of_week } = departureData;
+    const now = new Date();
+    if (!service_date) {
+      service_date = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    }
+    if (!day_of_week) {
+      day_of_week = now.toLocaleDateString('en-GB', { weekday: 'long' });
+    }
 
     // Convert boolean to integer for SQLite
     const isCancelledInt = is_cancelled ? 1 : 0;
 
-    // Check if a record already exists for this departure time and destination
-    const existing = this.db.prepare(`
-      SELECT id FROM train_departures 
-      WHERE departure_time = ? AND destination = ?
-    `).get(departure_time, destination);
+    // Determine grouping key using scheduled time (std) to represent the logical service
+    const scheduledTime = std || departure_time; // fallback for legacy callers
 
-    if (existing) {
-      // Update existing record
-      const update = this.db.prepare(`
-        UPDATE train_departures 
-        SET platform = ?, operator = ?, is_cancelled = ?, delay_reason = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `);
-      update.run(platform, operator, isCancelledInt, delay_reason, existing.id);
-      console.log(`Updated departure record for ${departure_time} to ${destination}`);
-    } else {
-      // Insert new record
-      const insert = this.db.prepare(`
-        INSERT INTO train_departures (departure_time, platform, destination, operator, is_cancelled, delay_reason)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `);
-      insert.run(departure_time, platform, destination, operator, isCancelledInt, delay_reason);
-      console.log(`Stored new departure record for ${departure_time} to ${destination}`);
+    // Fetch the most recent snapshot for this logical service
+    const latest = this.db.prepare(`
+      SELECT * FROM train_departures
+      WHERE service_date = ? AND destination = ? AND std = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(service_date, destination, scheduledTime);
+
+    // Normalize fields for comparison
+    const latestComparable = latest || {};
+    const nextEtd = etd || null;
+    const nextDepartureTime = nextEtd || scheduledTime;
+
+    const hasChange = !latest || (
+      latestComparable.platform !== platform ||
+      latestComparable.operator !== operator ||
+      Number(latestComparable.is_cancelled) !== isCancelledInt ||
+      (latestComparable.delay_reason || null) !== (delay_reason || null) ||
+      (latestComparable.etd || null) !== nextEtd ||
+      (latestComparable.departure_time || null) !== nextDepartureTime
+    );
+
+    if (!hasChange) {
+      console.log(`No change detected for ${service_date} ${scheduledTime} to ${destination}; skipping insert`);
+      return;
     }
+
+    // Insert new snapshot row (append-only)
+    const insert = this.db.prepare(`
+      INSERT INTO train_departures (
+        service_date, day_of_week, departure_time, std, etd, platform, destination, operator, is_cancelled, delay_reason
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insert.run(
+      service_date,
+      day_of_week,
+      nextDepartureTime,
+      scheduledTime,
+      nextEtd,
+      platform,
+      destination,
+      operator,
+      isCancelledInt,
+      delay_reason
+    );
+    console.log(`Stored new snapshot for ${service_date} ${scheduledTime} (${nextDepartureTime}) to ${destination}`);
   }
 
   // Get recent departures
