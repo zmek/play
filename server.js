@@ -100,9 +100,9 @@ app.get('/api/health', (req, res) => {
 });
 
 // Get recent departures from database.
-app.get('/api/departures/recent', (req, res) => {
+app.get('/api/departures', (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = req.query.limit ? parseInt(req.query.limit) : null;
     // Get the recent departures from the database.
     const departures = trainDB.getRecentDepartures(limit);
     res.json({ departures, count: departures.length });
@@ -124,7 +124,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running at http://localhost:${PORT}`);
   console.log(`API available at http://localhost:${PORT}/api/next-train/PAD/TLH`);
   console.log(`Database endpoints:`);
-  console.log(`  - Recent departures: http://localhost:${PORT}/api/departures/recent`);
+  console.log(`  - Recent departures: http://localhost:${PORT}/api/departures`);
   if (ENABLE_POLLER) {
     console.log(`Poller enabled. FROM=${FROM_CRS} TO=${TO_CRS} every ${POLL_MS}ms`);
     // Kick off immediately, then on interval

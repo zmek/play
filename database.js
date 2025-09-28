@@ -149,40 +149,24 @@ class TrainDatabase {
   }
 
   // Get recent departures
-  getRecentDepartures(limit = 10) {
-    const stmt = this.db.prepare(`
-      SELECT * FROM train_departures 
-      ORDER BY created_at DESC 
-      LIMIT ?
-    `);
-    return stmt.all(limit);
+  getRecentDepartures(limit = null) {
+    if (limit) {
+      const stmt = this.db.prepare(`
+        SELECT * FROM train_departures 
+        ORDER BY created_at DESC 
+        LIMIT ?
+      `);
+      return stmt.all(limit);
+    } else {
+      const stmt = this.db.prepare(`
+        SELECT * FROM train_departures 
+        ORDER BY created_at DESC
+      `);
+      return stmt.all();
+    }
   }
 
-  // Get departures by platform
-  getDeparturesByPlatform(platform) {
-    const stmt = this.db.prepare(`
-      SELECT * FROM train_departures 
-      WHERE platform = ? 
-      ORDER BY created_at DESC
-    `);
-    return stmt.all(platform);
-  }
 
-  // Get platform statistics
-  getPlatformStats() {
-    const stmt = this.db.prepare(`
-      SELECT 
-        platform,
-        COUNT(*) as count,
-        COUNT(CASE WHEN is_cancelled = 0 THEN 1 END) as on_time_count,
-        COUNT(CASE WHEN is_cancelled = 1 THEN 1 END) as cancelled_count
-      FROM train_departures 
-      WHERE platform IS NOT NULL
-      GROUP BY platform
-      ORDER BY count DESC
-    `);
-    return stmt.all();
-  }
 
   // Clean up old records (keep last 3 months)
   cleanupOldRecords() {

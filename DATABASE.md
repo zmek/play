@@ -42,9 +42,7 @@ CREATE TABLE train_departures (
 - `GET /api/next-train/:from/:to` - Get next train (now also stores data in database)
 
 ### New Database Endpoints
-- `GET /api/departures/recent?limit=10` - Get recent departures from database
-- `GET /api/departures/platform/:platform` - Get departures by platform
-- `GET /api/platforms/stats` - Get platform usage statistics
+- `GET /api/departures?limit=10` - Get recent departures from database (returns all if no limit specified)
 
 ## Usage
 
@@ -90,7 +88,11 @@ The database file will be persisted in the `./data` directory.
 
 ### Get recent departures
 ```bash
-curl http://localhost:3000/api/departures/recent?limit=5
+# Get all recent departures
+curl http://localhost:3000/api/departures
+
+# Get limited number of recent departures
+curl http://localhost:3000/api/departures?limit=5
 ```
 
 ## Database Class Methods
