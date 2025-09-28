@@ -165,6 +165,37 @@ app.get('/api/all-platforms', (req, res) => {
   }
 });
 
+// Generate SVG chart for next departing service
+app.get('/api/next-train-chart/:from/:to', async (req, res) => {
+  try {
+    const { from, to } = req.params;
+
+    // First get the next train to identify the service
+    const { departure } = await fetchAndStoreNextDeparture(from, to);
+
+    if (!departure || !departure.service) {
+      return res.status(404).json({ error: 'No train found' });
+    }
+
+    const service = departure.service;
+    const now = new Date();
+    const dayOfWeek = now.toLocaleDateString('en-GB', { weekday: 'long' });
+    const std = service.std;
+
+    // Get platform counts for this service
+    const platformCounts = trainDB.getServicePlatformCounts(dayOfWeek, std);
+
+    // Generate SVG chart
+    const svg = generatePlatformChart(platformCounts, dayOfWeek, std);
+
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.send(svg);
+  } catch (error) {
+    console.error('Error generating chart:', error);
+    res.status(500).json({ error: 'Failed to generate chart' });
+  }
+});
+
 // Serve the main HTML page.
 // The '/' route serves the main HTML page for the frontend application.
 // When a user visits the root URL, this handler sends 'public/index.html' as the response.
@@ -180,6 +211,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  - Recent departures: http://localhost:${PORT}/api/departures`);
   console.log(`  - Service platform counts: http://localhost:${PORT}/api/platforms/Monday/08:30`);
   console.log(`  - All services platform data: http://localhost:${PORT}/api/all-platforms`);
+  console.log(`  - Next train chart: http://localhost:${PORT}/api/next-train-chart/PAD/TLH`);
   if (ENABLE_POLLER) {
     console.log(`Poller enabled. FROM=${FROM_CRS} TO=${TO_CRS} every ${POLL_MS}ms`);
     // Kick off immediately, then on interval
@@ -196,6 +228,67 @@ app.listen(PORT, '0.0.0.0', () => {
 setInterval(() => {
   trainDB.cleanupOldRecords();
 }, 12 * 60 * 60 * 1000); // 12 hours
+
+// Generate SVG chart for platform distribution
+function generatePlatformChart(platformCounts, dayOfWeek, std) {
+  // Create a map of platform counts for easy lookup
+  const platformMap = {};
+  platformCounts.forEach(item => {
+    platformMap[item.platform] = item.count;
+  });
+
+  // Find the maximum count for scaling
+  const maxCount = Math.max(...platformCounts.map(item => item.count), 1);
+
+  // Chart dimensions - vertical layout
+  const chartWidth = 800;
+  const chartHeight = 300;
+  const barWidth = 40;
+  const barSpacing = 10;
+  const leftMargin = 60;
+  const rightMargin = 60;
+  const topMargin = 60;
+  const bottomMargin = 40;
+
+  // Calculate available height for bars
+  const availableHeight = chartHeight - topMargin - bottomMargin;
+
+  // Generate bars for all 14 platforms
+  let bars = '';
+  let labels = '';
+
+  for (let platform = 1; platform <= 14; platform++) {
+    const count = platformMap[platform] || 0;
+    const barHeight = (count / maxCount) * availableHeight;
+    const x = leftMargin + (platform - 1) * (barWidth + barSpacing);
+
+    // Platform label - centered below the bar
+    labels += `<text x="${x + barWidth / 2}" y="${chartHeight - 10}" text-anchor="middle" font-family="'Courier New', monospace" font-size="14" fill="#000">${platform}</text>`;
+
+    // Bar background (light gray) - drawn from bottom up
+    bars += `<rect x="${x}" y="${chartHeight - bottomMargin - availableHeight}" width="${barWidth}" height="${availableHeight}" fill="#f0f0f0" stroke="#ddd" stroke-width="1"/>`;
+
+    // Bar fill (black) - drawn from bottom up
+    bars += `<rect x="${x}" y="${chartHeight - bottomMargin - barHeight}" width="${barWidth}" height="${barHeight}" fill="#000"/>`;
+
+    // Count label - centered above the bar
+    bars += `<text x="${x + barWidth / 2}" y="${chartHeight - bottomMargin - barHeight - 5}" text-anchor="middle" font-family="'Courier New', monospace" font-size="12" fill="#666">${count}</text>`;
+  }
+
+  // Title
+  const title = `<text x="${chartWidth / 2}" y="20" text-anchor="middle" font-family="'Courier New', monospace" font-size="16" font-weight="bold" fill="#000">Platform Usage: ${dayOfWeek} ${std}</text>`;
+
+  // Subtitle with total days
+  const totalDays = platformCounts.reduce((sum, item) => sum + item.count, 0);
+  const subtitle = `<text x="${chartWidth / 2}" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="12" fill="#666">Total days observed: ${totalDays}</text>`;
+
+  return `<svg width="${chartWidth}" height="${chartHeight}" xmlns="http://www.w3.org/2000/svg">
+    ${title}
+    ${subtitle}
+    ${labels}
+    ${bars}
+  </svg>`;
+}
 
 // Graceful shutdown. This is a signal handler that runs when the server is shut down.
 process.on('SIGINT', () => {
