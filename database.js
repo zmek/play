@@ -101,22 +101,29 @@ class TrainDatabase {
       LIMIT 1
     `).get(service_date, destination, scheduledTime);
 
+    // If we have a recent record (within last 5 minutes), be more strict about changes
+    const currentTime = new Date();
+    const fiveMinutesAgo = new Date(currentTime.getTime() - 5 * 60 * 1000);
+    const isRecent = latest && new Date(latest.created_at) > fiveMinutesAgo;
+
     // Normalize fields for comparison
     const latestComparable = latest || {};
     const nextEtd = etd || null;
     const nextDepartureTime = nextEtd || scheduledTime;
 
+    // Normalize null/undefined values for proper comparison
+    const normalizeValue = (val) => val === null || val === undefined ? null : val;
+
     const hasChange = !latest || (
-      latestComparable.platform !== platform ||
-      latestComparable.operator !== operator ||
+      normalizeValue(latestComparable.platform) !== normalizeValue(platform) ||
+      normalizeValue(latestComparable.operator) !== normalizeValue(operator) ||
       Number(latestComparable.is_cancelled) !== isCancelledInt ||
-      (latestComparable.delay_reason || null) !== (delay_reason || null) ||
-      (latestComparable.etd || null) !== nextEtd ||
-      (latestComparable.departure_time || null) !== nextDepartureTime
+      normalizeValue(latestComparable.delay_reason) !== normalizeValue(delay_reason) ||
+      normalizeValue(latestComparable.etd) !== normalizeValue(nextEtd) ||
+      normalizeValue(latestComparable.departure_time) !== normalizeValue(nextDepartureTime)
     );
 
     if (!hasChange) {
-      console.log(`No change detected for ${service_date} ${scheduledTime} to ${destination}; skipping insert`);
       return;
     }
 
