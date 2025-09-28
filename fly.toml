@@ -9,11 +9,11 @@ primary_region = 'lhr'
 [build]
 
 [http_service]
-auto_start_machines = true
-auto_stop_machines = 'stop'
+auto_start_machines = false
+auto_stop_machines = "off"
 force_https = true
 internal_port = 3000
-min_machines_running = 0
+min_machines_running = 1
 processes = ['app']
 
 [[http_service.checks]]

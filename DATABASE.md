@@ -35,14 +35,43 @@ CREATE TABLE train_departures (
 - **Data persistence**: Database file is persisted in Docker volumes
 - **Automatic cleanup**: Old records (3+ months) are automatically cleaned up
 - **Query endpoints**: RESTful API endpoints for retrieving stored data
+- **Platform analysis**: Advanced platform distribution analysis across services
+
+## Platform Analysis Features
+
+The database includes sophisticated platform analysis capabilities that help understand platform usage patterns:
+
+### Service Identification
+- Services are identified by `(day_of_week, scheduled_time, destination)`
+- Uses `std` (scheduled time) as the primary service identifier
+- Falls back to `departure_time` for legacy data without `std`
+
+### Platform Distribution Analysis
+- **Per-service analysis**: Get platform counts for specific services
+- **Comprehensive analysis**: Analyze platform usage across all services
+- **Historical accuracy**: Uses the most recent record per service date to avoid duplicate counting
+- **Change tracking**: Platform changes are captured as new snapshots, preserving historical data
+
+### Data Quality
+- Only includes records with non-null platform information
+- Filters out incomplete or invalid platform data
+- Provides total day counts for statistical confidence
 
 ## API Endpoints
 
-### Existing Endpoints
+### Core Endpoints
 - `GET /api/next-train/:from/:to` - Get next train (now also stores data in database)
+- `GET /api/health` - Health check endpoint
 
-### New Database Endpoints
+### Database Query Endpoints
 - `GET /api/departures?limit=10` - Get recent departures from database (returns all if no limit specified)
+
+### Platform Analysis Endpoints
+- `GET /api/platforms/:dayOfWeek/:std` - Get platform counts for a specific service
+  - Parameters: `dayOfWeek` (Monday-Sunday), `std` (HH:MM format)
+  - Returns platform distribution for the specified service
+- `GET /api/all-platforms` - Get platform counts for all services
+  - Returns comprehensive platform analysis across all services
 
 ## Usage
 
@@ -53,12 +82,27 @@ CREATE TABLE train_departures (
    npm install
    ```
 
-2. Test the database:
+2. Run all tests:
    ```bash
-   node test-database.js
+   npm test
    ```
 
-3. Start the server:
+3. Or run individual tests:
+   ```bash
+   # Test database functionality
+   npm run test-database
+   
+   # Test API endpoints (requires server running)
+   npm run test-api
+   
+   # Test platform analysis endpoints
+   npm run test-platforms
+   
+   # Test URL endpoints
+   npm run test-urls
+   ```
+
+4. Start the server:
    ```bash
    npm start
    ```
@@ -68,6 +112,18 @@ CREATE TABLE train_departures (
 1. Build and run with Docker Compose:
    ```bash
    docker-compose up --build
+   ```
+
+2. Test the application inside Docker:
+   ```bash
+   # Run all tests
+   docker compose exec -T train-app npm test
+   
+   # Or run individual tests
+   docker compose exec -T train-app npm run test-database
+   docker compose exec -T train-app npm run test-api
+   docker compose exec -T train-app npm run test-platforms
+   docker compose exec -T train-app npm run test-urls
    ```
 
 The database file will be persisted in the `./data` directory.
@@ -95,14 +151,42 @@ curl http://localhost:3000/api/departures
 curl http://localhost:3000/api/departures?limit=5
 ```
 
+### Platform analysis queries
+```bash
+# Get platform counts for a specific service (Monday 08:30)
+curl http://localhost:3000/api/platforms/Monday/08:30
+
+# Get platform counts for Friday evening service
+curl http://localhost:3000/api/platforms/Friday/17:15
+
+# Get comprehensive platform analysis for all services
+curl http://localhost:3000/api/all-platforms
+```
+
+### Health check
+```bash
+# Check server status
+curl http://localhost:3000/api/health
+```
+
 ## Database Class Methods
 
 The `TrainDatabase` class provides the following methods:
 
+### Core Methods
 - `storeDeparture(departureData)` - Append-only store with change detection
 - `getRecentDepartures(limit)` - Get recent departures
 - `cleanupOldRecords()` - Remove records older than 3 months
 - `close()` - Close database connection
+
+### Platform Analysis Methods
+- `getServicePlatformCounts(dayOfWeek, std)` - Get platform distribution for a specific service
+  - Returns platform counts for the specified day of week and scheduled time
+  - Uses the most recent record per service date for accurate analysis
+- `getAllServicesPlatformCounts()` - Get platform analysis for all services
+  - Returns comprehensive platform data across all services
+  - Groups by service (day of week + scheduled time + destination)
+  - Includes total days and platform distribution for each service
 
 ## Indexes
 

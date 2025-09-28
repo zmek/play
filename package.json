@@ -6,8 +6,12 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test-api": "node test-api.js",
-    "quick-test": "node quick-test.js"
+    "test": "node test-runner.js",
+    "test-api": "node tests/test-api.js",
+    "test-database": "node tests/test-database.js",
+    "test-platforms": "node tests/test-platforms.js",
+    "test-urls": "node tests/test-urls.js",
+    "quick-test": "node tests/quick-test.js"
   },
   "dependencies": {
     "express": "^4.18.2",

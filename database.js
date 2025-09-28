@@ -168,6 +168,96 @@ class TrainDatabase {
 
 
 
+  // Get platform counts for a given service (identified by day_of_week and std)
+  getServicePlatformCounts(dayOfWeek, std) {
+    // First, get the most recent record per service_date for the given service
+    // that has a non-null platform
+    const stmt = this.db.prepare(`
+      WITH latest_records AS (
+        SELECT service_date, day_of_week, std, platform, destination,
+               ROW_NUMBER() OVER (
+                 PARTITION BY service_date 
+                 ORDER BY created_at DESC
+               ) as rn
+        FROM train_departures
+        WHERE day_of_week = ? AND std = ? AND platform IS NOT NULL
+      )
+      SELECT platform, COUNT(*) as count
+      FROM latest_records
+      WHERE rn = 1
+      GROUP BY platform
+      ORDER BY platform
+    `);
+
+    const results = stmt.all(dayOfWeek, std);
+    return results;
+  }
+
+  // Get platform counts for all services
+  getAllServicesPlatformCounts() {
+    // Get the most recent record per service_date for each service
+    // that has a non-null platform, grouped by service (day_of_week + scheduled_time + destination)
+    // Use std if available, otherwise fall back to departure_time
+    const stmt = this.db.prepare(`
+      WITH latest_records AS (
+        SELECT service_date, day_of_week, 
+               COALESCE(std, departure_time) as scheduled_time,
+               std, departure_time, platform, destination,
+               ROW_NUMBER() OVER (
+                 PARTITION BY service_date, day_of_week, COALESCE(std, departure_time), destination
+                 ORDER BY created_at DESC
+               ) as rn
+        FROM train_departures
+        WHERE platform IS NOT NULL
+      ),
+      service_platforms AS (
+        SELECT day_of_week, scheduled_time, std, departure_time, platform, destination, COUNT(*) as count
+        FROM latest_records
+        WHERE rn = 1
+        GROUP BY day_of_week, scheduled_time, std, departure_time, platform, destination
+      )
+      SELECT day_of_week, scheduled_time, std, departure_time, destination, platform, count
+      FROM service_platforms
+      ORDER BY day_of_week, scheduled_time, platform
+    `);
+
+    const results = stmt.all();
+
+    // Group results by service (day_of_week + scheduled_time + destination)
+    const services = {};
+    results.forEach(row => {
+      const serviceKey = `${row.day_of_week}_${row.scheduled_time}_${row.destination}`;
+      if (!services[serviceKey]) {
+        services[serviceKey] = {
+          dayOfWeek: row.day_of_week,
+          scheduledTime: row.scheduled_time,
+          destination: row.destination,
+          platformCounts: [],
+          totalDays: 0
+        };
+      }
+      services[serviceKey].platformCounts.push({
+        platform: row.platform,
+        count: row.count
+      });
+      services[serviceKey].totalDays += row.count;
+    });
+
+    // Convert to array and sort
+    return Object.values(services).sort((a, b) => {
+      const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const aDayIndex = dayOrder.indexOf(a.dayOfWeek);
+      const bDayIndex = dayOrder.indexOf(b.dayOfWeek);
+
+      if (aDayIndex !== bDayIndex) {
+        return aDayIndex - bDayIndex;
+      }
+
+      // If same day, sort by time
+      return a.scheduledTime.localeCompare(b.scheduledTime);
+    });
+  }
+
   // Clean up old records (keep last 3 months)
   cleanupOldRecords() {
     const stmt = this.db.prepare(`

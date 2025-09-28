@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Simple test script to verify database functionality
-const TrainDatabase = require('./database');
+const TrainDatabase = require('../database');
 
 console.log('Testing train database functionality...\n');
 
