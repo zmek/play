@@ -112,6 +112,59 @@ app.get('/api/departures', (req, res) => {
   }
 });
 
+// Get platform counts for a specific service (identified by day of week and scheduled time)
+app.get('/api/platforms/:dayOfWeek/:std', (req, res) => {
+  try {
+    const { dayOfWeek, std } = req.params;
+
+    // Validate day of week
+    const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    if (!validDays.includes(dayOfWeek)) {
+      return res.status(400).json({
+        error: 'Invalid day of week. Must be one of: ' + validDays.join(', ')
+      });
+    }
+
+    // Validate std format (basic time format check)
+    const timePattern = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timePattern.test(std)) {
+      return res.status(400).json({
+        error: 'Invalid scheduled time format. Expected HH:MM format (e.g., 08:30)'
+      });
+    }
+
+    const platformCounts = trainDB.getServicePlatformCounts(dayOfWeek, std);
+
+    res.json({
+      service: {
+        dayOfWeek,
+        scheduledTime: std
+      },
+      platformCounts,
+      totalDays: platformCounts.reduce((sum, item) => sum + item.count, 0)
+    });
+  } catch (error) {
+    console.error('Error fetching service platform counts:', error);
+    res.status(500).json({ error: 'Failed to fetch service platform counts' });
+  }
+});
+
+// Get platform counts for all services
+app.get('/api/all-platforms', (req, res) => {
+  try {
+    const allServices = trainDB.getAllServicesPlatformCounts();
+
+    res.json({
+      services: allServices,
+      totalServices: allServices.length,
+      generatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching all service platform counts:', error);
+    res.status(500).json({ error: 'Failed to fetch all service platform counts' });
+  }
+});
+
 // Serve the main HTML page.
 // The '/' route serves the main HTML page for the frontend application.
 // When a user visits the root URL, this handler sends 'public/index.html' as the response.
@@ -125,6 +178,8 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`API available at http://localhost:${PORT}/api/next-train/PAD/TLH`);
   console.log(`Database endpoints:`);
   console.log(`  - Recent departures: http://localhost:${PORT}/api/departures`);
+  console.log(`  - Service platform counts: http://localhost:${PORT}/api/platforms/Monday/08:30`);
+  console.log(`  - All services platform data: http://localhost:${PORT}/api/all-platforms`);
   if (ENABLE_POLLER) {
     console.log(`Poller enabled. FROM=${FROM_CRS} TO=${TO_CRS} every ${POLL_MS}ms`);
     // Kick off immediately, then on interval
