@@ -101,22 +101,29 @@ class TrainDatabase {
       LIMIT 1
     `).get(service_date, destination, scheduledTime);
 
+    // If we have a recent record (within last 5 minutes), be more strict about changes
+    const currentTime = new Date();
+    const fiveMinutesAgo = new Date(currentTime.getTime() - 5 * 60 * 1000);
+    const isRecent = latest && new Date(latest.created_at) > fiveMinutesAgo;
+
     // Normalize fields for comparison
     const latestComparable = latest || {};
     const nextEtd = etd || null;
     const nextDepartureTime = nextEtd || scheduledTime;
 
+    // Normalize null/undefined values for proper comparison
+    const normalizeValue = (val) => val === null || val === undefined ? null : val;
+
     const hasChange = !latest || (
-      latestComparable.platform !== platform ||
-      latestComparable.operator !== operator ||
+      normalizeValue(latestComparable.platform) !== normalizeValue(platform) ||
+      normalizeValue(latestComparable.operator) !== normalizeValue(operator) ||
       Number(latestComparable.is_cancelled) !== isCancelledInt ||
-      (latestComparable.delay_reason || null) !== (delay_reason || null) ||
-      (latestComparable.etd || null) !== nextEtd ||
-      (latestComparable.departure_time || null) !== nextDepartureTime
+      normalizeValue(latestComparable.delay_reason) !== normalizeValue(delay_reason) ||
+      normalizeValue(latestComparable.etd) !== normalizeValue(nextEtd) ||
+      normalizeValue(latestComparable.departure_time) !== normalizeValue(nextDepartureTime)
     );
 
     if (!hasChange) {
-      console.log(`No change detected for ${service_date} ${scheduledTime} to ${destination}; skipping insert`);
       return;
     }
 
@@ -142,40 +149,24 @@ class TrainDatabase {
   }
 
   // Get recent departures
-  getRecentDepartures(limit = 10) {
-    const stmt = this.db.prepare(`
-      SELECT * FROM train_departures 
-      ORDER BY created_at DESC 
-      LIMIT ?
-    `);
-    return stmt.all(limit);
+  getRecentDepartures(limit = null) {
+    if (limit) {
+      const stmt = this.db.prepare(`
+        SELECT * FROM train_departures 
+        ORDER BY created_at DESC 
+        LIMIT ?
+      `);
+      return stmt.all(limit);
+    } else {
+      const stmt = this.db.prepare(`
+        SELECT * FROM train_departures 
+        ORDER BY created_at DESC
+      `);
+      return stmt.all();
+    }
   }
 
-  // Get departures by platform
-  getDeparturesByPlatform(platform) {
-    const stmt = this.db.prepare(`
-      SELECT * FROM train_departures 
-      WHERE platform = ? 
-      ORDER BY created_at DESC
-    `);
-    return stmt.all(platform);
-  }
 
-  // Get platform statistics
-  getPlatformStats() {
-    const stmt = this.db.prepare(`
-      SELECT 
-        platform,
-        COUNT(*) as count,
-        COUNT(CASE WHEN is_cancelled = 0 THEN 1 END) as on_time_count,
-        COUNT(CASE WHEN is_cancelled = 1 THEN 1 END) as cancelled_count
-      FROM train_departures 
-      WHERE platform IS NOT NULL
-      GROUP BY platform
-      ORDER BY count DESC
-    `);
-    return stmt.all();
-  }
 
   // Clean up old records (keep last 3 months)
   cleanupOldRecords() {

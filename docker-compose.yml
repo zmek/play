@@ -14,4 +14,8 @@ services:
       - NEXTDEPS_API_KEY=${NEXTDEPS_API_KEY:-your-nextdeps-api-key}
       - NEXTDEPS_BASE_URL=${NEXTDEPS_BASE_URL:-https://api1.raildata.org.uk/1010-live-departure-board-dep1_2}
       - PORT=3000
+      - ENABLE_POLLER=true
+      - FROM_CRS=PAD
+      - TO_CRS=TLH
+      - POLL_MS=120000
     restart: unless-stopped
