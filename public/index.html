@@ -61,6 +61,14 @@
         <div style="margin:0 0 6px 0;font-family: 'Courier New', monospace; font-size: 24px; color: #666;">Next train
             from Paddington to Tilehurst departs at</div>
 
+        <!-- Navigation links -->
+        <div style="margin: 10px 0; text-align: right;">
+            <a href="#" onclick="showServiceBrowser()"
+                style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 14px;">
+                Browse all services →
+            </a>
+        </div>
+
         <!-- Dynamic content container - populated by JavaScript -->
         <div id="train-display">
             <div>Loading departure information...</div>
@@ -125,6 +133,12 @@
                             <div style="margin: 10px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">${service.platform ? `Platform: ${service.platform}` : ''}</div>
                             ${service.isCancelled ? '<div style="color: red; font-weight: bold;">CANCELLED</div>' : ''}
                             ${service.delayReason ? `<div style="color: #666;">Delay reason: ${service.delayReason}</div>` : ''}
+                            <div style="margin: 20px 0;">
+                                <a href="#" onclick="viewServiceHistory('${getCurrentDayOfWeek()}', '${service.std}', '${departure.crs || 'TLH'}')" 
+                                   style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 16px;">
+                                    View historical data for this service →
+                                </a>
+                            </div>
                         `;
 
                     // Schedule next refresh based on how close the departure is
@@ -293,6 +307,497 @@
                 clearTimeout(refreshTimer);
             }
         });
+
+        // Function to get current day of week in the required format
+        function getCurrentDayOfWeek() {
+            const now = new Date();
+            return now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', weekday: 'long' });
+        }
+
+        // Function to navigate to service history page
+        function viewServiceHistory(dayOfWeek, scheduledTime, destination) {
+            // Hide the main content and show service history
+            document.querySelector('main').style.display = 'none';
+
+            // Create service history container if it doesn't exist
+            let historyContainer = document.getElementById('service-history-container');
+            if (!historyContainer) {
+                historyContainer = document.createElement('div');
+                historyContainer.id = 'service-history-container';
+                historyContainer.style.cssText = `
+                    padding: 1em;
+                    line-height: 1.4;
+                    font-size: 14px;
+                    font-family: monospace;
+                `;
+                document.body.appendChild(historyContainer);
+            }
+
+            // Show the history container
+            historyContainer.style.display = 'block';
+            historyContainer.innerHTML = `
+                <div style="margin: 0 0 20px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">
+                    Historical Data: ${dayOfWeek} ${scheduledTime} → ${destination}
+                </div>
+                <div style="margin: 10px 0;">
+                    <a href="#" onclick="showMainPage()" 
+                       style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 16px;">
+                        ← Back to live view
+                    </a>
+                </div>
+                <div id="service-history-content">
+                    <div>Loading historical data...</div>
+                </div>
+            `;
+
+            // Load the historical data
+            loadServiceHistory(dayOfWeek, scheduledTime, destination);
+        }
+
+        // Function to load service history data
+        async function loadServiceHistory(dayOfWeek, scheduledTime, destination) {
+            const content = document.getElementById('service-history-content');
+
+            try {
+                // Fetch service records
+                const response = await fetch(`/api/service/${dayOfWeek}/${scheduledTime}/${destination}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.records && data.records.length > 0) {
+                    // Display the records in a table format
+                    let tableHTML = `
+                        <div style="margin: 20px 0;">
+                            <h3 style="font-family: 'Courier New', monospace; color: #333;">Service Records (${data.totalRecords} total)</h3>
+                            <table style="border-collapse: collapse; width: 100%; font-family: 'Courier New', monospace; font-size: 12px;">
+                                <thead>
+                                    <tr style="background-color: #f5f5f5;">
+                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Platform</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Scheduled</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Expected</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Status</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Captured</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    data.records.forEach(record => {
+                        const status = record.is_cancelled ? 'CANCELLED' : 'On time';
+                        const platform = record.platform || 'Unknown';
+                        const expectedTime = record.etd || record.std;
+
+                        tableHTML += `
+                            <tr>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${record.service_date}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${platform}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${record.std}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${expectedTime}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; color: ${record.is_cancelled ? 'red' : 'green'};">${status}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${new Date(record.created_at).toLocaleString('en-GB')}</td>
+                            </tr>
+                        `;
+                    });
+
+                    tableHTML += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                    // Also load platform distribution chart
+                    tableHTML += `
+                        <div style="margin: 20px 0;">
+                            <h3 style="font-family: 'Courier New', monospace; color: #333;">Platform Distribution</h3>
+                            <div id="platform-chart-container">
+                                <div>Loading platform chart...</div>
+                            </div>
+                        </div>
+                    `;
+
+                    content.innerHTML = tableHTML;
+
+                    // Load platform chart
+                    loadServicePlatformChart(dayOfWeek, scheduledTime, destination);
+
+                } else {
+                    content.innerHTML = `
+                        <div style="color: #666; font-family: 'Courier New', monospace; padding: 2em; text-align: center;">
+                            No historical data found for this service.
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Error loading service history:', error);
+                content.innerHTML = `
+                    <div style="color: red; font-family: 'Courier New', monospace; padding: 2em; text-align: center;">
+                        Failed to load historical data: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Function to load platform chart for a specific service
+        async function loadServicePlatformChart(dayOfWeek, scheduledTime, destination) {
+            const chartContainer = document.getElementById('platform-chart-container');
+
+            try {
+                // Fetch the platform counts
+                const response = await fetch(`/api/platforms/${dayOfWeek}/${scheduledTime}/${destination}`);
+
+                if (!response.ok) {
+                    throw new Error(`Chart request failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.platformCounts && data.platformCounts.length > 0) {
+                    // Generate a simple text-based chart
+                    let chartHTML = `
+                        <div style="font-family: 'Courier New', monospace; font-size: 12px; margin: 10px 0;">
+                            <div style="margin-bottom: 10px;">Total days observed: ${data.totalDays}</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    `;
+
+                    data.platformCounts.forEach(item => {
+                        const percentage = Math.round((item.count / data.totalDays) * 100);
+                        chartHTML += `
+                            <div style="border: 1px solid #ddd; padding: 8px; text-align: center; min-width: 60px;">
+                                <div style="font-weight: bold;">Platform ${item.platform}</div>
+                                <div>${item.count} days</div>
+                                <div style="color: #666;">(${percentage}%)</div>
+                            </div>
+                        `;
+                    });
+
+                    chartHTML += `
+                            </div>
+                        </div>
+                    `;
+
+                    chartContainer.innerHTML = chartHTML;
+                } else {
+                    chartContainer.innerHTML = `
+                        <div style="color: #666; font-family: 'Courier New', monospace; padding: 1em; text-align: center;">
+                            No platform data available for this service.
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Error loading platform chart:', error);
+                chartContainer.innerHTML = `
+                    <div style="color: #999; font-family: 'Courier New', monospace; padding: 1em; text-align: center;">
+                        Unable to load platform data
+                    </div>
+                `;
+            }
+        }
+
+        // Function to return to main page
+        function showMainPage() {
+            document.querySelector('main').style.display = 'block';
+            const historyContainer = document.getElementById('service-history-container');
+            const browserContainer = document.getElementById('service-browser-container');
+            const chartContainer = document.getElementById('service-platform-chart-container');
+            if (historyContainer) {
+                historyContainer.style.display = 'none';
+            }
+            if (browserContainer) {
+                browserContainer.style.display = 'none';
+            }
+            if (chartContainer) {
+                chartContainer.style.display = 'none';
+            }
+        }
+
+        // Function to show service browser
+        function showServiceBrowser() {
+            // Hide the main content and show service browser
+            document.querySelector('main').style.display = 'none';
+
+            // Hide other containers
+            const historyContainer = document.getElementById('service-history-container');
+            const chartContainer = document.getElementById('service-platform-chart-container');
+            if (historyContainer) {
+                historyContainer.style.display = 'none';
+            }
+            if (chartContainer) {
+                chartContainer.style.display = 'none';
+            }
+
+            // Create service browser container if it doesn't exist
+            let browserContainer = document.getElementById('service-browser-container');
+            if (!browserContainer) {
+                browserContainer = document.createElement('div');
+                browserContainer.id = 'service-browser-container';
+                browserContainer.style.cssText = `
+                    padding: 1em;
+                    line-height: 1.4;
+                    font-size: 14px;
+                    font-family: monospace;
+                `;
+                document.body.appendChild(browserContainer);
+            }
+
+            // Show the browser container
+            browserContainer.style.display = 'block';
+            browserContainer.innerHTML = `
+                <div style="margin: 0 0 20px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">
+                    Service Browser
+                </div>
+                <div style="margin: 10px 0;">
+                    <a href="#" onclick="showMainPage()" 
+                       style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 16px;">
+                        ← Back to live view
+                    </a>
+                </div>
+                <div style="margin: 20px 0;">
+                    <input type="text" id="service-search" placeholder="Search by day, time, or destination..." 
+                           style="padding: 8px; font-family: 'Courier New', monospace; font-size: 14px; width: 300px; border: 1px solid #ddd;">
+                    <select id="day-filter" style="padding: 8px; font-family: 'Courier New', monospace; font-size: 14px; margin-left: 10px; border: 1px solid #ddd;">
+                        <option value="">All Days</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                        <option value="Sunday">Sunday</option>
+                    </select>
+                </div>
+                <div id="service-list">
+                    <div>Loading services...</div>
+                </div>
+            `;
+
+            // Load the services
+            loadServiceList();
+
+            // Add search functionality
+            const searchInput = document.getElementById('service-search');
+            const dayFilter = document.getElementById('day-filter');
+
+            searchInput.addEventListener('input', filterServices);
+            dayFilter.addEventListener('change', filterServices);
+        }
+
+        // Function to load service list
+        async function loadServiceList() {
+            const serviceList = document.getElementById('service-list');
+
+            try {
+                // Fetch all services
+                const response = await fetch('/api/services');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.services && data.services.length > 0) {
+                    // Store services globally for filtering
+                    window.allServices = data.services;
+
+                    // Display the services
+                    displayServices(data.services);
+                } else {
+                    serviceList.innerHTML = `
+                        <div style="color: #666; font-family: 'Courier New', monospace; padding: 2em; text-align: center;">
+                            No services found in the database.
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Error loading services:', error);
+                serviceList.innerHTML = `
+                    <div style="color: red; font-family: 'Courier New', monospace; padding: 2em; text-align: center;">
+                        Failed to load services: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Function to display services
+        function displayServices(services) {
+            const serviceList = document.getElementById('service-list');
+
+            // Group services by day of week
+            const groupedServices = {};
+            services.forEach(service => {
+                if (!groupedServices[service.dayOfWeek]) {
+                    groupedServices[service.dayOfWeek] = [];
+                }
+                groupedServices[service.dayOfWeek].push(service);
+            });
+
+            let html = `
+                <div style="margin: 10px 0; font-family: 'Courier New', monospace; font-size: 16px; color: #333;">
+                    Found ${services.length} services
+                </div>
+            `;
+
+            // Sort days of week
+            const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+            dayOrder.forEach(day => {
+                if (groupedServices[day]) {
+                    html += `
+                        <div style="margin: 20px 0;">
+                            <h3 style="font-family: 'Courier New', monospace; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+                                ${day} (${groupedServices[day].length} services)
+                            </h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+                    `;
+
+                    // Sort services by time
+                    groupedServices[day].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+
+                    groupedServices[day].forEach(service => {
+                        html += `
+                            <div style="border: 1px solid #ddd; padding: 10px; cursor: pointer; transition: background-color 0.2s;" 
+                                 onclick="viewServicePlatformChart('${service.dayOfWeek}', '${service.scheduledTime}', '${service.destination}')"
+                                 onmouseover="this.style.backgroundColor='#f5f5f5'" 
+                                 onmouseout="this.style.backgroundColor='white'">
+                                <div style="font-weight: bold; font-size: 16px;">${service.scheduledTime}</div>
+                                <div style="color: #666; font-size: 12px;">→ ${service.destination}</div>
+                                <div style="color: #999; font-size: 11px;">${service.totalRecords} records</div>
+                                <div style="color: #999; font-size: 11px;">First seen: ${service.firstSeen}</div>
+                                <div style="color: #007bff; font-size: 10px; margin-top: 5px;">Click to view platform chart</div>
+                            </div>
+                        `;
+                    });
+
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            serviceList.innerHTML = html;
+        }
+
+        // Function to filter services
+        function filterServices() {
+            const searchTerm = document.getElementById('service-search').value.toLowerCase();
+            const dayFilter = document.getElementById('day-filter').value;
+
+            if (!window.allServices) return;
+
+            let filteredServices = window.allServices;
+
+            // Filter by day
+            if (dayFilter) {
+                filteredServices = filteredServices.filter(service => service.dayOfWeek === dayFilter);
+            }
+
+            // Filter by search term
+            if (searchTerm) {
+                filteredServices = filteredServices.filter(service =>
+                    service.dayOfWeek.toLowerCase().includes(searchTerm) ||
+                    service.scheduledTime.includes(searchTerm) ||
+                    service.destination.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            displayServices(filteredServices);
+        }
+
+        // Function to view platform chart for a specific service
+        function viewServicePlatformChart(dayOfWeek, scheduledTime, destination) {
+            // Hide the browser and show platform chart view
+            const browserContainer = document.getElementById('service-browser-container');
+            if (browserContainer) {
+                browserContainer.style.display = 'none';
+            }
+
+            // Create platform chart container if it doesn't exist
+            let chartContainer = document.getElementById('service-platform-chart-container');
+            if (!chartContainer) {
+                chartContainer = document.createElement('div');
+                chartContainer.id = 'service-platform-chart-container';
+                chartContainer.style.cssText = `
+                    padding: 1em;
+                    line-height: 1.4;
+                    font-size: 14px;
+                    font-family: monospace;
+                `;
+                document.body.appendChild(chartContainer);
+            }
+
+            // Show the chart container
+            chartContainer.style.display = 'block';
+            chartContainer.innerHTML = `
+                <div style="margin: 0 0 20px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">
+                    Platform Chart: ${dayOfWeek} ${scheduledTime} → ${destination}
+                </div>
+                <div style="margin: 10px 0;">
+                    <a href="#" onclick="showServiceBrowser()" 
+                       style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 16px;">
+                        ← Back to service browser
+                    </a>
+                    <span style="margin: 0 10px;">|</span>
+                    <a href="#" onclick="showMainPage()" 
+                       style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 16px;">
+                        ← Back to live view
+                    </a>
+                </div>
+                <div id="platform-chart-display">
+                    <div>Loading platform chart...</div>
+                </div>
+            `;
+
+            // Load the platform chart
+            loadServicePlatformChartDisplay(dayOfWeek, scheduledTime, destination);
+        }
+
+        // Function to load and display platform chart
+        async function loadServicePlatformChartDisplay(dayOfWeek, scheduledTime, destination) {
+            const chartDisplay = document.getElementById('platform-chart-display');
+
+            try {
+                // Fetch the SVG chart from the server (same as main page)
+                const response = await fetch(`/api/service-chart/${dayOfWeek}/${scheduledTime}/${destination}`);
+
+                if (!response.ok) {
+                    throw new Error(`Chart request failed: ${response.status}`);
+                }
+
+                // Get the SVG content
+                const svgContent = await response.text();
+
+                // Display the chart with animation (same as main page)
+                chartDisplay.innerHTML = svgContent;
+
+                // Add entrance animation
+                chartDisplay.style.opacity = '0';
+                chartDisplay.style.transform = 'translateY(20px)';
+                chartDisplay.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+
+                // Trigger animation
+                setTimeout(() => {
+                    chartDisplay.style.opacity = '1';
+                    chartDisplay.style.transform = 'translateY(0)';
+                }, 100);
+
+            } catch (error) {
+                console.error('Error loading platform chart:', error);
+                chartDisplay.innerHTML = `
+                    <div style="color: red; font-family: 'Courier New', monospace; padding: 2em; text-align: center;">
+                        Failed to load platform chart: ${error.message}
+                    </div>
+                `;
+            }
+        }
     </script>
 </body>
 
