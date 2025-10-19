@@ -21,29 +21,6 @@
     - setTimeout() schedules next data refresh based on departure proximity
 -->
 
-<head>
-    <style>
-        /* Responsive chart styling */
-        #chart-content svg {
-            max-width: 100%;
-            height: auto;
-        }
-
-        /* Mobile responsiveness */
-        @media (max-width: 768px) {
-            #chart-content svg {
-                width: 100%;
-                height: auto;
-            }
-        }
-
-        /* Chart animation styles */
-        .chart-bar {
-            transition: width 0.8s ease;
-        }
-    </style>
-</head>
-
 <body style="
     margin:0;
     min-height:100vh;          /* fallback */
@@ -64,14 +41,6 @@
         <!-- Dynamic content container - populated by JavaScript -->
         <div id="train-display">
             <div>Loading departure information...</div>
-        </div>
-
-        <!-- Platform chart container -->
-        <div id="chart-container" style="margin-top: 2em; display: none;">
-            <div id="chart-loading" style="text-align: center; color: #666; font-family: 'Courier New', monospace;">
-                Loading platform history...
-            </div>
-            <div id="chart-content" style="display: none;"></div>
         </div>
     </main>
 
@@ -129,9 +98,6 @@
 
                     // Schedule next refresh based on how close the departure is
                     scheduleNextRefresh(departTime);
-
-                    // Load platform chart for this service
-                    loadPlatformChart();
                 } else {
                     // No trains found - show appropriate message
                     display.innerHTML = `
@@ -149,9 +115,6 @@
                     `;
                     // Schedule a refresh in 1 hour when no trains are found
                     scheduleNextRefresh(null, 60 * 60 * 1000);
-
-                    // Hide chart when no trains found
-                    document.getElementById('chart-container').style.display = 'none';
                 }
 
             } catch (error) {
@@ -163,54 +126,6 @@
         `;
                 // Schedule a refresh in 30 seconds on error
                 scheduleNextRefresh(null, 30 * 1000);
-
-                // Hide chart on error
-                document.getElementById('chart-container').style.display = 'none';
-            }
-        }
-
-        // Function to load platform chart for the current service
-        async function loadPlatformChart() {
-            const chartContainer = document.getElementById('chart-container');
-            const chartLoading = document.getElementById('chart-loading');
-            const chartContent = document.getElementById('chart-content');
-
-            try {
-                // Show chart container and loading state
-                chartContainer.style.display = 'block';
-                chartLoading.style.display = 'block';
-                chartContent.style.display = 'none';
-
-                // Fetch the SVG chart from the server
-                const response = await fetch('/api/next-train-chart/PAD/TLH');
-
-                if (!response.ok) {
-                    throw new Error(`Chart request failed: ${response.status}`);
-                }
-
-                // Get the SVG content
-                const svgContent = await response.text();
-
-                // Display the chart with animation
-                chartContent.innerHTML = svgContent;
-                chartLoading.style.display = 'none';
-                chartContent.style.display = 'block';
-
-                // Add entrance animation
-                chartContent.style.opacity = '0';
-                chartContent.style.transform = 'translateY(20px)';
-                chartContent.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-
-                // Trigger animation
-                setTimeout(() => {
-                    chartContent.style.opacity = '1';
-                    chartContent.style.transform = 'translateY(0)';
-                }, 100);
-
-            } catch (error) {
-                console.error('Error loading platform chart:', error);
-                chartLoading.innerHTML = 'Unable to load platform history';
-                chartLoading.style.color = '#999';
             }
         }
 
