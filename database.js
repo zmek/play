@@ -3,7 +3,8 @@ const path = require('path');
 const fs = require('fs');
 
 class TrainDatabase {
-  constructor() {
+  constructor(logger = null) {
+    this.logger = logger;
     // Decide on a writable data directory with persistence when available
     // Priority: explicit DATA_DIR env → Fly volume mount at /data → local ./data
     let dataDir = process.env.DATA_DIR && process.env.DATA_DIR.trim()
@@ -81,10 +82,11 @@ class TrainDatabase {
     let { service_date, day_of_week } = departureData;
     const now = new Date();
     if (!service_date) {
-      service_date = now.toISOString().slice(0, 10); // YYYY-MM-DD
+      // Use UK local time to handle BST correctly
+      service_date = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-'); // YYYY-MM-DD
     }
     if (!day_of_week) {
-      day_of_week = now.toLocaleDateString('en-GB', { weekday: 'long' });
+      day_of_week = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', weekday: 'long' });
     }
 
     // Convert boolean to integer for SQLite
@@ -145,7 +147,13 @@ class TrainDatabase {
       isCancelledInt,
       delay_reason
     );
-    console.log(`Stored new snapshot for ${service_date} ${scheduledTime} (${nextDepartureTime}) to ${destination}`);
+    const ukTime = new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', hour12: false });
+    const logMessage = `[${ukTime}] Stored new snapshot for ${service_date} ${scheduledTime} (${nextDepartureTime}) to ${destination}`;
+    if (this.logger) {
+      this.logger.log(logMessage);
+    } else {
+      console.log(logMessage);
+    }
   }
 
   // Get recent departures
@@ -168,10 +176,37 @@ class TrainDatabase {
 
 
 
-  // Get platform counts for a given service (identified by day_of_week and std)
-  getServicePlatformCounts(dayOfWeek, std) {
+  // Get all records for a given service (identified by day_of_week, std, and destination)
+  getServiceRecords(dayOfWeek, std, destination) {
+    const stmt = this.db.prepare(`
+      SELECT * FROM train_departures
+      WHERE day_of_week = ? AND std = ? AND destination = ?
+      ORDER BY service_date DESC, created_at DESC
+    `);
+    return stmt.all(dayOfWeek, std, destination);
+  }
+
+  // Get the last known non-null platform for a service on today's date
+  getLastKnownPlatform(serviceDate, std, destination) {
+    const stmt = this.db.prepare(`
+      SELECT platform FROM train_departures
+      WHERE service_date = ? AND std = ? AND destination = ? AND platform IS NOT NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+    const result = stmt.get(serviceDate, std, destination);
+    return result ? result.platform : null;
+  }
+
+  // Get platform counts for a given service (identified by day_of_week, std, and destination)
+  // Excludes today's data to show only historical patterns
+  getServicePlatformCounts(dayOfWeek, std, destination) {
+    // Use UK local time to handle BST correctly
+    const now = new Date();
+    const today = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-'); // YYYY-MM-DD format
+
     // First, get the most recent record per service_date for the given service
-    // that has a non-null platform
+    // that has a non-null platform, excluding today's data
     const stmt = this.db.prepare(`
       WITH latest_records AS (
         SELECT service_date, day_of_week, std, platform, destination,
@@ -180,7 +215,7 @@ class TrainDatabase {
                  ORDER BY created_at DESC
                ) as rn
         FROM train_departures
-        WHERE day_of_week = ? AND std = ? AND platform IS NOT NULL
+        WHERE day_of_week = ? AND std = ? AND destination = ? AND platform IS NOT NULL AND service_date != ?
       )
       SELECT platform, COUNT(*) as count
       FROM latest_records
@@ -189,12 +224,54 @@ class TrainDatabase {
       ORDER BY platform
     `);
 
-    const results = stmt.all(dayOfWeek, std);
+    const results = stmt.all(dayOfWeek, std, destination, today);
     return results;
   }
 
+  // Get all unique services from the database
+  getUniqueServices() {
+    const stmt = this.db.prepare(`
+      SELECT DISTINCT 
+        day_of_week,
+        COALESCE(std, departure_time) as scheduled_time,
+        std,
+        departure_time,
+        destination,
+        COUNT(*) as total_records,
+        MIN(service_date) as first_seen,
+        MAX(service_date) as last_seen,
+        MIN(created_at) as first_captured,
+        MAX(created_at) as last_captured
+      FROM train_departures
+      GROUP BY day_of_week, COALESCE(std, departure_time), destination
+      ORDER BY day_of_week, scheduled_time, destination
+    `);
+
+    const results = stmt.all();
+
+    // Convert to more readable format
+    return results.map(row => ({
+      dayOfWeek: row.day_of_week,
+      scheduledTime: row.scheduled_time,
+      destination: row.destination,
+      totalRecords: row.total_records,
+      firstSeen: row.first_seen,
+      lastSeen: row.last_seen,
+      firstCaptured: row.first_captured,
+      lastCaptured: row.last_captured,
+      // Include both std and departure_time for reference
+      std: row.std,
+      departureTime: row.departure_time
+    }));
+  }
+
   // Get platform counts for all services
+  // Excludes today's data to show only historical patterns
   getAllServicesPlatformCounts() {
+    // Use UK local time to handle BST correctly
+    const now = new Date();
+    const today = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-'); // YYYY-MM-DD format
+
     // Get the most recent record per service_date for each service
     // that has a non-null platform, grouped by service (day_of_week + scheduled_time + destination)
     // Use std if available, otherwise fall back to departure_time
@@ -208,7 +285,7 @@ class TrainDatabase {
                  ORDER BY created_at DESC
                ) as rn
         FROM train_departures
-        WHERE platform IS NOT NULL
+        WHERE platform IS NOT NULL AND service_date != ?
       ),
       service_platforms AS (
         SELECT day_of_week, scheduled_time, std, departure_time, platform, destination, COUNT(*) as count
@@ -221,7 +298,7 @@ class TrainDatabase {
       ORDER BY day_of_week, scheduled_time, platform
     `);
 
-    const results = stmt.all();
+    const results = stmt.all(today);
 
     // Group results by service (day_of_week + scheduled_time + destination)
     const services = {};

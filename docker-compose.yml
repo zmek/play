@@ -6,7 +6,7 @@ services:
       - "3000:3000"
     volumes:
       - ./public:/app/public:ro  # Mount public folder for live updates
-      - ./data:/app/data  # Persist database and other data
+      - ./data:/app/data  # Persist database and other data (includes logs)
     environment:
       - NODE_ENV=development
       - LDBWS_API_KEY=${LDBWS_API_KEY:-your-api-key-here}
