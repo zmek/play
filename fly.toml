@@ -3,6 +3,11 @@
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
+# To enable polling, set ENABLE_POLLER=true in the environment variables.
+# /Users/zellaking/.fly/bin/flyctl secrets set ENABLE_POLLER=true POLL_MS=120000
+#
+#  To see logs
+# /Users/zellaking/.fly/bin/flyctl logs --no-tail
 
 app = 'play-vtm7ea'
 primary_region = 'lhr'

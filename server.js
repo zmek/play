@@ -284,6 +284,51 @@ app.get('/api/next-train-chart/:from/:to', async (req, res) => {
   }
 });
 
+// Generate SVG chart for any specific service
+app.get('/api/service-chart/:dayOfWeek/:std/:destination?', (req, res) => {
+  try {
+    const { dayOfWeek, std } = req.params;
+    const destination = req.params.destination || 'TLH';
+
+    // Validate day of week
+    const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    if (!validDays.includes(dayOfWeek)) {
+      return res.status(400).json({
+        error: 'Invalid day of week. Must be one of: ' + validDays.join(', ')
+      });
+    }
+
+    // Validate std format (basic time format check)
+    const timePattern = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timePattern.test(std)) {
+      return res.status(400).json({
+        error: 'Invalid scheduled time format. Expected HH:MM format (e.g., 08:30)'
+      });
+    }
+
+    // Get platform counts for this service
+    const platformCounts = trainDB.getServicePlatformCounts(dayOfWeek, std, destination);
+
+    if (!platformCounts || platformCounts.length === 0) {
+      // Return a chart showing no platform data instead of 404
+      const emptyPlatformCounts = [];
+      const svg = generatePlatformChart(emptyPlatformCounts, dayOfWeek, std, null);
+      res.setHeader('Content-Type', 'image/svg+xml');
+      res.send(svg);
+      return;
+    }
+
+    // Generate SVG chart (no current platform since this is historical data)
+    const svg = generatePlatformChart(platformCounts, dayOfWeek, std, null);
+
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.send(svg);
+  } catch (error) {
+    console.error('Error generating service chart:', error);
+    res.status(500).json({ error: 'Failed to generate chart' });
+  }
+});
+
 // Serve the main HTML page.
 // The '/' route serves the main HTML page for the frontend application.
 // When a user visits the root URL, this handler sends 'public/index.html' as the response.
@@ -302,6 +347,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  - Service platform counts: http://localhost:${PORT}/api/platforms/Monday/08:30 (destination defaults to TLH)`);
   console.log(`  - All services platform data: http://localhost:${PORT}/api/all-platforms`);
   console.log(`  - Next train chart: http://localhost:${PORT}/api/next-train-chart/PAD/TLH`);
+  console.log(`  - Service chart: http://localhost:${PORT}/api/service-chart/Monday/08:30 (destination defaults to TLH)`);
   if (ENABLE_POLLER) {
     console.log(`Poller enabled. FROM=${FROM_CRS} TO=${TO_CRS} every ${POLL_MS}ms`);
     // Kick off immediately, then on interval
