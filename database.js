@@ -229,22 +229,44 @@ class TrainDatabase {
   }
 
   // Get all unique services from the database
+  // Count only unique service dates where platform data is recorded
   getUniqueServices() {
     const stmt = this.db.prepare(`
-      SELECT DISTINCT 
-        day_of_week,
-        COALESCE(std, departure_time) as scheduled_time,
-        std,
-        departure_time,
-        destination,
-        COUNT(*) as total_records,
-        MIN(service_date) as first_seen,
-        MAX(service_date) as last_seen,
-        MIN(created_at) as first_captured,
-        MAX(created_at) as last_captured
-      FROM train_departures
-      GROUP BY day_of_week, COALESCE(std, departure_time), destination
-      ORDER BY day_of_week, scheduled_time, destination
+      WITH latest_records AS (
+        SELECT service_date, day_of_week, 
+               COALESCE(std, departure_time) as scheduled_time,
+               std, departure_time, platform, destination,
+               ROW_NUMBER() OVER (
+                 PARTITION BY service_date, day_of_week, COALESCE(std, departure_time), destination
+                 ORDER BY created_at DESC
+               ) as rn
+        FROM train_departures
+        WHERE platform IS NOT NULL
+      ),
+      service_dates AS (
+        SELECT day_of_week, scheduled_time, std, departure_time, destination, service_date
+        FROM latest_records
+        WHERE rn = 1
+      )
+      SELECT 
+        service_dates.day_of_week,
+        service_dates.scheduled_time,
+        service_dates.std,
+        service_dates.departure_time,
+        service_dates.destination,
+        COUNT(DISTINCT service_dates.service_date) as total_records,
+        MIN(service_dates.service_date) as first_seen,
+        MAX(service_dates.service_date) as last_seen,
+        MIN(td.created_at) as first_captured,
+        MAX(td.created_at) as last_captured
+      FROM service_dates
+      LEFT JOIN train_departures td ON (
+        td.day_of_week = service_dates.day_of_week AND
+        td.destination = service_dates.destination AND
+        COALESCE(td.std, td.departure_time) = service_dates.scheduled_time
+      )
+      GROUP BY service_dates.day_of_week, service_dates.scheduled_time, service_dates.destination
+      ORDER BY service_dates.day_of_week, service_dates.scheduled_time, service_dates.destination
     `);
 
     const results = stmt.all();
