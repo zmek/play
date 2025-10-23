@@ -134,7 +134,7 @@
                             ${service.isCancelled ? '<div style="color: red; font-weight: bold;">CANCELLED</div>' : ''}
                             ${service.delayReason ? `<div style="color: #666;">Delay reason: ${service.delayReason}</div>` : ''}
                             <div style="margin: 20px 0;">
-                                <a href="#" onclick="viewServiceHistory('${getCurrentDayOfWeek()}', '${service.std}', '${departure.crs || 'TLH'}')" 
+                                <a href="#" onclick="viewServiceHistory('${getCurrentDayOfWeek()}', '${service.std}', '${nextTrain.crs || 'TLH'}')" 
                                    style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 16px;">
                                     View historical data for this service →
                                 </a>
