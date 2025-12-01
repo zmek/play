@@ -22,49 +22,19 @@
 -->
 
 <head>
-    <style>
-        /* Responsive chart styling */
-        #chart-content svg {
-            max-width: 100%;
-            height: auto;
-        }
-
-        /* Mobile responsiveness */
-        @media (max-width: 768px) {
-            #chart-content svg {
-                width: 100%;
-                height: auto;
-            }
-        }
-
-        /* Chart animation styles */
-        .chart-bar {
-            transition: width 0.8s ease;
-        }
-    </style>
+    <link rel="stylesheet" href="/styles.css">
 </head>
 
-<body style="
-    margin:0;
-    min-height:100vh;          /* fallback */
-    min-height:100dvh;         /* mobile-safe */
-    font-family:monospace;
-    background:#fff;
-  ">
+<body>
 
-    <main style="
-      padding:1em;
-      line-height:1.4;
-      font-size:14px;
-    ">
+    <main>
         <!-- Static header text - never changes -->
-        <div style="margin:0 0 6px 0;font-family: 'Courier New', monospace; font-size: 24px; color: #666;">Next train
+        <div class="text-header margin-bottom-small">Next train
             from Paddington to Tilehurst departs at</div>
 
         <!-- Navigation links -->
-        <div style="margin: 10px 0; text-align: right;">
-            <a href="#" onclick="showServiceBrowser()"
-                style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 14px;">
+        <div class="margin-bottom text-right">
+            <a href="#" onclick="showServiceBrowser()" class="link">
                 Browse all services →
             </a>
         </div>
@@ -75,11 +45,11 @@
         </div>
 
         <!-- Platform chart container -->
-        <div id="chart-container" style="margin-top: 2em; display: none;">
-            <div id="chart-loading" style="text-align: center; color: #666; font-family: 'Courier New', monospace;">
+        <div id="chart-container" class="chart-container">
+            <div id="chart-loading" class="chart-loading">
                 Loading platform history...
             </div>
-            <div id="chart-content" style="display: none;"></div>
+            <div id="chart-content" class="chart-content"></div>
         </div>
     </main>
 
@@ -117,25 +87,12 @@
 
                     // Build simplified display showing the exact departure time (no countdown)
                     display.innerHTML = `
-                            <div style="
-                            font-family: 'Courier New', monospace;
-                            font-size: 120px;
-                            font-weight: bold;
-                            margin: 20px 0;
-                            color: #000;
-                            text-align: left;
-                            letter-spacing: 4px;
-                            min-height: 120px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: flex-start;
-                            ">${departTime || '--:--'}</div>
-                            <div style="margin: 10px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">${service.platform ? `Platform: ${service.platform}` : ''}</div>
-                            ${service.isCancelled ? '<div style="color: red; font-weight: bold;">CANCELLED</div>' : ''}
-                            ${service.delayReason ? `<div style="color: #666;">Delay reason: ${service.delayReason}</div>` : ''}
-                            <div style="margin: 20px 0;">
-                                <a href="#" onclick="viewServiceHistory('${getCurrentDayOfWeek()}', '${service.std}', '${nextTrain.crs || 'TLH'}')" 
-                                   style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 16px;">
+                            <div class="text-large">${departTime || '--:--'}</div>
+                            ${service.platform ? `<div class="text-platform">Platform: ${service.platform}</div>` : ''}
+                            ${service.isCancelled ? '<div class="status-cancelled">CANCELLED</div>' : ''}
+                            ${service.delayReason ? `<div class="status-delay-reason">Delay reason: ${service.delayReason}</div>` : ''}
+                            <div class="margin-bottom-large">
+                                <a href="#" onclick="viewServiceHistory('${getCurrentDayOfWeek()}', '${service.std}', '${nextTrain.crs || 'TLH'}')" class="link-large">
                                     View historical data for this service →
                                 </a>
                             </div>
@@ -149,16 +106,9 @@
                 } else {
                     // No trains found - show appropriate message
                     display.innerHTML = `
-                        <div style="
-                            font-family: 'Courier New', monospace;
-                            font-size: 48px;
-                            font-weight: bold;
-                            text-align: center;
-                            color: #666;
-                            padding: 2em;
-                        ">
+                        <div class="text-no-trains">
                             No trains found.<br>
-                            <span style="font-size: 24px;">Trying again in one hour.</span>
+                            <span class="text-no-trains-subtitle">Trying again in one hour.</span>
                         </div>
                     `;
                     // Schedule a refresh in 1 hour when no trains are found
@@ -208,23 +158,17 @@
                 // Display the chart with animation
                 chartContent.innerHTML = svgContent;
                 chartLoading.style.display = 'none';
-                chartContent.style.display = 'block';
-
-                // Add entrance animation
-                chartContent.style.opacity = '0';
-                chartContent.style.transform = 'translateY(20px)';
-                chartContent.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                chartContent.classList.add('chart-animate');
 
                 // Trigger animation
                 setTimeout(() => {
-                    chartContent.style.opacity = '1';
-                    chartContent.style.transform = 'translateY(0)';
+                    chartContent.classList.add('visible');
                 }, 100);
 
             } catch (error) {
                 console.error('Error loading platform chart:', error);
                 chartLoading.innerHTML = 'Unable to load platform history';
-                chartLoading.style.color = '#999';
+                chartLoading.classList.add('message-loading');
             }
         }
 
@@ -324,24 +268,18 @@
             if (!historyContainer) {
                 historyContainer = document.createElement('div');
                 historyContainer.id = 'service-history-container';
-                historyContainer.style.cssText = `
-                    padding: 1em;
-                    line-height: 1.4;
-                    font-size: 14px;
-                    font-family: monospace;
-                `;
+                historyContainer.className = 'container';
                 document.body.appendChild(historyContainer);
             }
 
             // Show the history container
             historyContainer.style.display = 'block';
             historyContainer.innerHTML = `
-                <div style="margin: 0 0 20px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">
+                <div class="section-header">
                     Historical Data: ${dayOfWeek} ${scheduledTime} → ${destination}
                 </div>
-                <div style="margin: 10px 0;">
-                    <a href="#" onclick="showMainPage()" 
-                       style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 16px;">
+                <div class="nav-links">
+                    <a href="#" onclick="showMainPage()" class="link-large">
                         ← Back to live view
                     </a>
                 </div>
@@ -371,17 +309,17 @@
                 if (data.records && data.records.length > 0) {
                     // Display the records in a table format
                     let tableHTML = `
-                        <div style="margin: 20px 0;">
-                            <h3 style="font-family: 'Courier New', monospace; color: #333;">Service Records (${data.totalRecords} total)</h3>
-                            <table style="border-collapse: collapse; width: 100%; font-family: 'Courier New', monospace; font-size: 12px;">
+                        <div class="table-container">
+                            <h3 class="section-subheader">Service Records (${data.totalRecords} total)</h3>
+                            <table class="table">
                                 <thead>
-                                    <tr style="background-color: #f5f5f5;">
-                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</th>
-                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Platform</th>
-                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Scheduled</th>
-                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Expected</th>
-                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Status</th>
-                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Captured</th>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Platform</th>
+                                        <th>Scheduled</th>
+                                        <th>Expected</th>
+                                        <th>Status</th>
+                                        <th>Captured</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -391,15 +329,16 @@
                         const status = record.is_cancelled ? 'CANCELLED' : 'On time';
                         const platform = record.platform || 'Unknown';
                         const expectedTime = record.etd || record.std;
+                        const statusClass = record.is_cancelled ? 'status-cancelled' : 'status-on-time';
 
                         tableHTML += `
                             <tr>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${record.service_date}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${platform}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${record.std}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${expectedTime}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px; color: ${record.is_cancelled ? 'red' : 'green'};">${status}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${new Date(record.created_at).toLocaleString('en-GB')}</td>
+                                <td>${record.service_date}</td>
+                                <td>${platform}</td>
+                                <td>${record.std}</td>
+                                <td>${expectedTime}</td>
+                                <td class="${statusClass}">${status}</td>
+                                <td>${new Date(record.created_at).toLocaleString('en-GB')}</td>
                             </tr>
                         `;
                     });
@@ -412,8 +351,8 @@
 
                     // Also load platform distribution chart
                     tableHTML += `
-                        <div style="margin: 20px 0;">
-                            <h3 style="font-family: 'Courier New', monospace; color: #333;">Platform Distribution</h3>
+                        <div class="table-container">
+                            <h3 class="section-subheader">Platform Distribution</h3>
                             <div id="platform-chart-container">
                                 <div>Loading platform chart...</div>
                             </div>
@@ -427,7 +366,7 @@
 
                 } else {
                     content.innerHTML = `
-                        <div style="color: #666; font-family: 'Courier New', monospace; padding: 2em; text-align: center;">
+                        <div class="message message-info">
                             No historical data found for this service.
                         </div>
                     `;
@@ -436,7 +375,7 @@
             } catch (error) {
                 console.error('Error loading service history:', error);
                 content.innerHTML = `
-                    <div style="color: red; font-family: 'Courier New', monospace; padding: 2em; text-align: center;">
+                    <div class="message message-error">
                         Failed to load historical data: ${error.message}
                     </div>
                 `;
@@ -460,18 +399,18 @@
                 if (data.platformCounts && data.platformCounts.length > 0) {
                     // Generate a simple text-based chart
                     let chartHTML = `
-                        <div style="font-family: 'Courier New', monospace; font-size: 12px; margin: 10px 0;">
+                        <div class="platform-chart-container">
                             <div style="margin-bottom: 10px;">Total days observed: ${data.totalDays}</div>
-                            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                            <div class="platform-chart-grid">
                     `;
 
                     data.platformCounts.forEach(item => {
                         const percentage = Math.round((item.count / data.totalDays) * 100);
                         chartHTML += `
-                            <div style="border: 1px solid #ddd; padding: 8px; text-align: center; min-width: 60px;">
-                                <div style="font-weight: bold;">Platform ${item.platform}</div>
+                            <div class="platform-chart-item">
+                                <div class="platform-chart-item-label">Platform ${item.platform}</div>
                                 <div>${item.count} days</div>
-                                <div style="color: #666;">(${percentage}%)</div>
+                                <div class="platform-chart-item-count">(${percentage}%)</div>
                             </div>
                         `;
                     });
@@ -484,7 +423,7 @@
                     chartContainer.innerHTML = chartHTML;
                 } else {
                     chartContainer.innerHTML = `
-                        <div style="color: #666; font-family: 'Courier New', monospace; padding: 1em; text-align: center;">
+                        <div class="message-loading">
                             No platform data available for this service.
                         </div>
                     `;
@@ -493,7 +432,7 @@
             } catch (error) {
                 console.error('Error loading platform chart:', error);
                 chartContainer.innerHTML = `
-                    <div style="color: #999; font-family: 'Courier New', monospace; padding: 1em; text-align: center;">
+                    <div class="message-loading">
                         Unable to load platform data
                     </div>
                 `;
@@ -537,31 +476,25 @@
             if (!browserContainer) {
                 browserContainer = document.createElement('div');
                 browserContainer.id = 'service-browser-container';
-                browserContainer.style.cssText = `
-                    padding: 1em;
-                    line-height: 1.4;
-                    font-size: 14px;
-                    font-family: monospace;
-                `;
+                browserContainer.className = 'container';
                 document.body.appendChild(browserContainer);
             }
 
             // Show the browser container
             browserContainer.style.display = 'block';
             browserContainer.innerHTML = `
-                <div style="margin: 0 0 20px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">
+                <div class="section-header">
                     Service Browser
                 </div>
-                <div style="margin: 10px 0;">
-                    <a href="#" onclick="showMainPage()" 
-                       style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 16px;">
+                <div class="nav-links">
+                    <a href="#" onclick="showMainPage()" class="link-large">
                         ← Back to live view
                     </a>
                 </div>
-                <div style="margin: 20px 0;">
+                <div class="filter-section">
                     <input type="text" id="service-search" placeholder="Search by day, time, or destination..." 
-                           style="padding: 8px; font-family: 'Courier New', monospace; font-size: 14px; width: 300px; border: 1px solid #ddd;">
-                    <select id="day-filter" style="padding: 8px; font-family: 'Courier New', monospace; font-size: 14px; margin-left: 10px; border: 1px solid #ddd;">
+                           class="input input-search">
+                    <select id="day-filter" class="select">
                         <option value="">All Days</option>
                         <option value="Monday">Monday</option>
                         <option value="Tuesday">Tuesday</option>
@@ -610,7 +543,7 @@
                     displayServices(data.services);
                 } else {
                     serviceList.innerHTML = `
-                        <div style="color: #666; font-family: 'Courier New', monospace; padding: 2em; text-align: center;">
+                        <div class="message message-info">
                             No services found in the database.
                         </div>
                     `;
@@ -619,7 +552,7 @@
             } catch (error) {
                 console.error('Error loading services:', error);
                 serviceList.innerHTML = `
-                    <div style="color: red; font-family: 'Courier New', monospace; padding: 2em; text-align: center;">
+                    <div class="message message-error">
                         Failed to load services: ${error.message}
                     </div>
                 `;
@@ -640,7 +573,7 @@
             });
 
             let html = `
-                <div style="margin: 10px 0; font-family: 'Courier New', monospace; font-size: 16px; color: #333;">
+                <div class="service-list-header">
                     Found ${services.length} services
                 </div>
             `;
@@ -651,11 +584,11 @@
             dayOrder.forEach(day => {
                 if (groupedServices[day]) {
                     html += `
-                        <div style="margin: 20px 0;">
-                            <h3 style="font-family: 'Courier New', monospace; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+                        <div class="service-day-group">
+                            <h3 class="service-day-header">
                                 ${day} (${groupedServices[day].length} services)
                             </h3>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+                            <div class="service-grid">
                     `;
 
                     // Sort services by time
@@ -663,15 +596,13 @@
 
                     groupedServices[day].forEach(service => {
                         html += `
-                            <div style="border: 1px solid #ddd; padding: 10px; cursor: pointer; transition: background-color 0.2s;" 
-                                 onclick="viewServicePlatformChart('${service.dayOfWeek}', '${service.scheduledTime}', '${service.destination}')"
-                                 onmouseover="this.style.backgroundColor='#f5f5f5'" 
-                                 onmouseout="this.style.backgroundColor='white'">
-                                <div style="font-weight: bold; font-size: 16px;">${service.scheduledTime}</div>
-                                <div style="color: #666; font-size: 12px;">→ ${service.destination}</div>
-                                <div style="color: #999; font-size: 11px;">${service.totalRecords} records</div>
-                                <div style="color: #999; font-size: 11px;">First seen: ${service.firstSeen}</div>
-                                <div style="color: #007bff; font-size: 10px; margin-top: 5px;">Click to view platform chart</div>
+                            <div class="service-card" 
+                                 onclick="viewServicePlatformChart('${service.dayOfWeek}', '${service.scheduledTime}', '${service.destination}')">
+                                <div class="service-card-time">${service.scheduledTime}</div>
+                                <div class="service-card-destination">→ ${service.destination}</div>
+                                <div class="service-card-meta">${service.totalRecords} records</div>
+                                <div class="service-card-meta">First seen: ${service.firstSeen}</div>
+                                <div class="service-card-link">Click to view platform chart</div>
                             </div>
                         `;
                     });
@@ -725,29 +656,22 @@
             if (!chartContainer) {
                 chartContainer = document.createElement('div');
                 chartContainer.id = 'service-platform-chart-container';
-                chartContainer.style.cssText = `
-                    padding: 1em;
-                    line-height: 1.4;
-                    font-size: 14px;
-                    font-family: monospace;
-                `;
+                chartContainer.className = 'container';
                 document.body.appendChild(chartContainer);
             }
 
             // Show the chart container
             chartContainer.style.display = 'block';
             chartContainer.innerHTML = `
-                <div style="margin: 0 0 20px 0; font-family: 'Courier New', monospace; font-size: 24px; color: #666;">
+                <div class="section-header">
                     Platform Chart: ${dayOfWeek} ${scheduledTime} → ${destination}
                 </div>
-                <div style="margin: 10px 0;">
-                    <a href="#" onclick="showServiceBrowser()" 
-                       style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 16px;">
+                <div class="nav-links">
+                    <a href="#" onclick="showServiceBrowser()" class="link-large">
                         ← Back to service browser
                     </a>
-                    <span style="margin: 0 10px;">|</span>
-                    <a href="#" onclick="showMainPage()" 
-                       style="color: #007bff; text-decoration: underline; font-family: 'Courier New', monospace; font-size: 16px;">
+                    <span class="nav-separator">|</span>
+                    <a href="#" onclick="showMainPage()" class="link-large">
                         ← Back to live view
                     </a>
                 </div>
@@ -779,20 +703,17 @@
                 chartDisplay.innerHTML = svgContent;
 
                 // Add entrance animation
-                chartDisplay.style.opacity = '0';
-                chartDisplay.style.transform = 'translateY(20px)';
-                chartDisplay.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                chartDisplay.classList.add('chart-animate');
 
                 // Trigger animation
                 setTimeout(() => {
-                    chartDisplay.style.opacity = '1';
-                    chartDisplay.style.transform = 'translateY(0)';
+                    chartDisplay.classList.add('visible');
                 }, 100);
 
             } catch (error) {
                 console.error('Error loading platform chart:', error);
                 chartDisplay.innerHTML = `
-                    <div style="color: red; font-family: 'Courier New', monospace; padding: 2em; text-align: center;">
+                    <div class="message message-error">
                         Failed to load platform chart: ${error.message}
                     </div>
                 `;
