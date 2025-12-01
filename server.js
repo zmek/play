@@ -361,9 +361,10 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // Clean up old records every 12 hours. This is a cron job that runs every 12 hours to remove old records from the database.
-setInterval(() => {
-  trainDB.cleanupOldRecords();
-}, 12 * 60 * 60 * 1000); // 12 hours
+// DISABLED: Automatic cleanup is currently disabled
+// setInterval(() => {
+//   trainDB.cleanupOldRecords();
+// }, 12 * 60 * 60 * 1000); // 12 hours
 
 // Generate SVG chart for platform distribution
 function generatePlatformChart(platformCounts, dayOfWeek, std, currentPlatform = null) {
