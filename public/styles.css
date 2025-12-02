@@ -1,14 +1,17 @@
 :root {
     --font: 'Courier New', monospace;
-    --primary: #fff; /* White for primary actions in this theme */
+    --primary: #fff;
+    /* White for primary actions in this theme */
     --text: #fff;
     --text-secondary: #aaa;
     --text-tertiary: #666;
     --text-dark: #ccc;
     --bg-light: #111;
     --border: #333;
-    --success: #0f0; /* Luminous green */
-    --error: #f00; /* Luminous red */
+    --success: #0f0;
+    /* Luminous green */
+    --error: #f00;
+    /* Luminous red */
 }
 
 body {
@@ -123,8 +126,13 @@ a.link-large:hover {
 
 .chart-container {
     margin-top: 2em;
-    display: none;
+    margin-bottom: 2em;
+    /* Added spacing below chart */
+    display: block;
+    /* Visible by default */
     background: #000;
+    min-height: 200px;
+    /* Reserve space */
 }
 
 .chart-loading {
@@ -143,7 +151,8 @@ a.link-large:hover {
 #chart-content svg {
     max-width: 100%;
     height: auto;
-    display: block; /* Remove inline-block gap */
+    display: block;
+    /* Remove inline-block gap */
 }
 
 @media (max-width: 768px) {
@@ -335,6 +344,7 @@ a.link-large:hover {
 .filter-section {
     margin: 20px 0;
 }
+
 /* Chart Animation Classes */
 .chart-content {
     opacity: 0;

@@ -32,6 +32,14 @@
         <div class="text-header margin-bottom-small">Next train
             from Paddington to Tilehurst departs at</div>
 
+        <!-- Platform chart container (Promoted to top) -->
+        <div id="chart-container" class="chart-container">
+            <div id="chart-loading" class="chart-loading">
+                Loading platform history...
+            </div>
+            <div id="chart-content" class="chart-content"></div>
+        </div>
+
         <!-- Navigation links -->
         <div class="margin-bottom text-right">
             <a href="#" onclick="showServiceBrowser()" class="link">
@@ -44,13 +52,7 @@
             <div>Loading departure information...</div>
         </div>
 
-        <!-- Platform chart container -->
-        <div id="chart-container" class="chart-container">
-            <div id="chart-loading" class="chart-loading">
-                Loading platform history...
-            </div>
-            <div id="chart-content" class="chart-content"></div>
-        </div>
+
     </main>
 
 
@@ -114,8 +116,8 @@
                     // Schedule a refresh in 1 hour when no trains are found
                     scheduleNextRefresh(null, 60 * 60 * 1000);
 
-                    // Hide chart when no trains found
-                    document.getElementById('chart-container').style.display = 'none';
+                    // Still try to load the chart (it might show historical data or empty track)
+                    loadPlatformChart();
                 }
 
             } catch (error) {
@@ -128,8 +130,8 @@
                 // Schedule a refresh in 30 seconds on error
                 scheduleNextRefresh(null, 30 * 1000);
 
-                // Hide chart on error
-                document.getElementById('chart-container').style.display = 'none';
+                // Ensure chart is visible even on error (it will show loading/error state)
+                document.getElementById('chart-container').style.display = 'block';
             }
         }
 
@@ -158,6 +160,7 @@
                 // Display the chart with animation
                 chartContent.innerHTML = svgContent;
                 chartLoading.style.display = 'none';
+                chartContent.style.display = 'block'; // Required to override previous display='none'
                 chartContent.classList.add('chart-animate');
 
                 // Trigger animation
