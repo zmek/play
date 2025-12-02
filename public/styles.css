@@ -1,14 +1,14 @@
 :root {
     --font: 'Courier New', monospace;
-    --primary: #007bff;
-    --text: #000;
-    --text-secondary: #666;
-    --text-tertiary: #999;
-    --text-dark: #333;
-    --bg-light: #f5f5f5;
-    --border: #ddd;
-    --success: green;
-    --error: red;
+    --primary: #fff; /* White for primary actions in this theme */
+    --text: #fff;
+    --text-secondary: #aaa;
+    --text-tertiary: #666;
+    --text-dark: #ccc;
+    --bg-light: #111;
+    --border: #333;
+    --success: #0f0; /* Luminous green */
+    --error: #f00; /* Luminous red */
 }
 
 body {
@@ -16,7 +16,8 @@ body {
     min-height: 100vh;
     min-height: 100dvh;
     font-family: var(--font);
-    background: #fff;
+    background: #000;
+    color: var(--text);
 }
 
 main {
@@ -34,6 +35,7 @@ main {
     min-height: 120px;
     display: flex;
     align-items: center;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
 .text-header {
@@ -67,8 +69,15 @@ main {
 
 a.link,
 a.link-large {
-    color: var(--primary);
+    color: var(--text);
     text-decoration: underline;
+    text-decoration-color: var(--text-tertiary);
+}
+
+a.link:hover,
+a.link-large:hover {
+    color: #fff;
+    text-shadow: 0 0 5px #fff;
 }
 
 .link-large {
@@ -78,10 +87,12 @@ a.link-large {
 .status-cancelled {
     color: var(--error);
     font-weight: bold;
+    text-shadow: 0 0 5px var(--error);
 }
 
 .status-on-time {
     color: var(--success);
+    text-shadow: 0 0 5px var(--success);
 }
 
 .status-delay-reason {
@@ -113,6 +124,7 @@ a.link-large {
 .chart-container {
     margin-top: 2em;
     display: none;
+    background: #000;
 }
 
 .chart-loading {
@@ -131,6 +143,7 @@ a.link-large {
 #chart-content svg {
     max-width: 100%;
     height: auto;
+    display: block; /* Remove inline-block gap */
 }
 
 @media (max-width: 768px) {
@@ -173,6 +186,11 @@ a.link-large {
     border: 1px solid var(--border);
     padding: 8px;
     text-align: left;
+    color: var(--text-secondary);
+}
+
+.table th {
+    color: var(--text);
 }
 
 .input,
@@ -180,6 +198,8 @@ a.link-large {
     padding: 8px;
     font-size: 14px;
     border: 1px solid var(--border);
+    background: #000;
+    color: var(--text);
 }
 
 .input-search {
@@ -216,16 +236,19 @@ a.link-large {
     border: 1px solid var(--border);
     padding: 10px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, border-color 0.2s;
+    background: #050505;
 }
 
 .service-card:hover {
     background-color: var(--bg-light);
+    border-color: #fff;
 }
 
 .service-card-time {
     font-weight: bold;
     font-size: 16px;
+    color: var(--text);
 }
 
 .service-card-destination {
@@ -239,7 +262,7 @@ a.link-large {
 }
 
 .service-card-link {
-    color: var(--primary);
+    color: var(--text-secondary);
     font-size: 10px;
     margin-top: 5px;
 }
@@ -264,6 +287,7 @@ a.link-large {
 
 .platform-chart-item-label {
     font-weight: bold;
+    color: var(--text);
 }
 
 .platform-chart-item-count {
@@ -295,6 +319,7 @@ a.link-large {
 
 .nav-separator {
     margin: 0 10px;
+    color: var(--text-tertiary);
 }
 
 .section-header {
@@ -309,4 +334,13 @@ a.link-large {
 
 .filter-section {
     margin: 20px 0;
+}
+/* Chart Animation Classes */
+.chart-content {
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+}
+
+.chart-content.visible {
+    opacity: 1;
 }

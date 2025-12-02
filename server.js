@@ -277,6 +277,7 @@ app.get('/api/next-train-chart/:from/:to', async (req, res) => {
     const svg = generatePlatformChart(platformCounts, dayOfWeek, std, currentPlatform);
 
     res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); // Ensure no caching
     res.send(svg);
   } catch (error) {
     console.error('Error generating chart:', error);
@@ -366,102 +367,147 @@ app.listen(PORT, '0.0.0.0', () => {
 //   trainDB.cleanupOldRecords();
 // }, 12 * 60 * 60 * 1000); // 12 hours
 
-// Generate SVG chart for platform distribution
+// Generate SVG chart for platform distribution (Kraftwerk Style)
 function generatePlatformChart(platformCounts, dayOfWeek, std, currentPlatform = null) {
+  console.log(`Generating chart for ${dayOfWeek} ${std}. Counts:`, JSON.stringify(platformCounts));
   // Create a map of platform counts for easy lookup
   const platformMap = {};
   platformCounts.forEach(item => {
     platformMap[item.platform] = item.count;
   });
+  console.log('Platform Map:', JSON.stringify(platformMap));
 
-  // Find the maximum count for scaling
-  const maxCount = Math.max(...platformCounts.map(item => item.count), 1);
+  // Chart dimensions
+  const width = 800;
+  const height = 500;
 
-  // Chart dimensions - vertical layout
-  const chartWidth = 800;
-  const chartHeight = 300;
-  const barWidth = 40;
-  const barSpacing = 10;
-  const leftMargin = 60;
-  const rightMargin = 60;
-  const topMargin = 60;
-  const bottomMargin = 40;
+  // Perspective Constants
+  const vpX = width / 2;       // Vanishing Point X (center)
+  const vpY = height * 0.2;    // Vanishing Point Y (horizon line, upper part of screen)
+  const startY = height;       // Start Y (bottom of screen)
+  const convergence = 0.5;     // Reduced from 0.8 to 0.5 to make distant objects larger
 
-  // Calculate available height for bars
-  const availableHeight = chartHeight - topMargin - bottomMargin;
+  // Track Configuration
+  const totalTracks = 14;      // We have 14 platforms
 
-  // Generate bars for all 14 platforms
-  let bars = '';
-  let labels = '';
-  let trainIcon = '';
+  // Calculate spacing to fit all tracks within the width with some margin
+  const margin = 100;
+  const availableWidth = width - margin * 2;
+  const spacing = availableWidth / (totalTracks - 1); // Spacing between centers
 
-  for (let platform = 1; platform <= 14; platform++) {
-    const count = platformMap[platform] || 0;
-    const barHeight = (count / maxCount) * availableHeight;
-    const x = leftMargin + (platform - 1) * (barWidth + barSpacing);
-    const isCurrentPlatform = currentPlatform && parseInt(currentPlatform) === platform;
+  // Helper function for 3D to 2D projection
+  // x: lateral offset from center (0 is center)
+  // z: depth (0 is closest, increases into distance)
+  function project(x, z) {
+    const scale = 1 / (z * convergence + 1);
 
-    // Platform label - centered below the bar
-    labels += `<text x="${x + barWidth / 2}" y="${chartHeight - 10}" text-anchor="middle" font-family="'Courier New', monospace" font-size="14" fill="#000">${platform}</text>`;
+    // x is already in screen coordinates relative to center
+    // We don't need an extra spread factor if we calculate x correctly for z=0
+    const px = vpX + x * scale;
+    const py = vpY + (startY - vpY) * scale;
 
-    // Bar background (light gray) - drawn from bottom up
-    const barClass = isCurrentPlatform ? 'platform-bar has-train' : 'platform-bar';
-    bars += `<rect x="${x}" y="${chartHeight - bottomMargin - availableHeight}" width="${barWidth}" height="${availableHeight}" fill="#f0f0f0" stroke="#ddd" stroke-width="1"/>`;
+    return { x: px, y: py, scale };
+  }
 
-    // Bar fill (black) - drawn from bottom up
-    bars += `<rect class="${barClass}" x="${x}" y="${chartHeight - bottomMargin - barHeight}" width="${barWidth}" height="${barHeight}" fill="#000"/>`;
+  let svgContent = '';
 
-    // Count label - centered above the bar
-    bars += `<text x="${x + barWidth / 2}" y="${chartHeight - bottomMargin - barHeight - 5}" text-anchor="middle" font-family="'Courier New', monospace" font-size="12" fill="#666">${count}</text>`;
+  // 1. Draw Tracks
+  for (let i = 0; i < totalTracks; i++) {
+    const platformNum = i + 1;
 
-    // Add train icon if this is the current platform
-    if (isCurrentPlatform) {
-      const trainX = x + barWidth / 2;
-      const trainY = chartHeight - bottomMargin - barHeight - 25;
+    // Calculate lateral position (x) relative to center for z=0
+    // i=0 -> -availableWidth/2
+    // i=13 -> +availableWidth/2
+    const xOffset = -availableWidth / 2 + i * spacing;
 
-      trainIcon += `
-        <g class="train-icon">
-          <!-- Train head -->
-          <rect class="train-head" x="${trainX - 8}" y="${trainY}" width="16" height="8" rx="2"/>
-          <!-- Train car 1 -->
-          <rect class="train-car" x="${trainX - 6}" y="${trainY + 8}" width="12" height="6"/>
-          <!-- Train coupling -->
-          <rect class="train-coupling" x="${trainX - 1}" y="${trainY + 14}" width="2" height="2"/>
-          <!-- Train car 2 -->
-          <rect class="train-car" x="${trainX - 6}" y="${trainY + 16}" width="12" height="6"/>
-        </g>
-      `;
+    const trackRadius = 15; // Increased from 10 to 15 (Wider tracks)
+
+    const leftRailX = xOffset - trackRadius;
+    const rightRailX = xOffset + trackRadius;
+
+    // Project start (z=0) and end (z=10) points
+    const zFar = 20;
+
+    const pStartLeft = project(leftRailX, 0);
+    const pStartRight = project(rightRailX, 0);
+    const pEndLeft = project(leftRailX, zFar);
+    const pEndRight = project(rightRailX, zFar);
+
+    // Draw Rails
+    // Left Rail
+    svgContent += `<line x1="${pStartLeft.x}" y1="${pStartLeft.y}" x2="${pEndLeft.x}" y2="${pEndLeft.y}" class="track-line" />`;
+    // Right Rail
+    svgContent += `<line x1="${pStartRight.x}" y1="${pStartRight.y}" x2="${pEndRight.x}" y2="${pEndRight.y}" class="track-line" />`;
+
+    // 2. Draw Sleepers (Data) - Matrix Cells
+    const count = platformMap[platformNum] || 0;
+
+    // Matrix Cell Configuration
+    const cellSpacing = 0.5; // Spacing between cell centers in Z
+    const cellGap = 0.05;    // Small gap between cells in Z
+    const cellZSize = cellSpacing - cellGap; // Physical Z-length of the cell
+
+    // To fit inside tracks:
+    // Track radius is 15. Let's make cells slightly narrower.
+    const cellPadding = 3;
+    const cellLeftX = leftRailX + cellPadding;
+    const cellRightX = rightRailX - cellPadding;
+
+    for (let j = 0; j < count; j++) {
+      // Start from very near foreground (z=0)
+      const zStart = j * cellSpacing;
+      const zEnd = zStart + cellZSize;
+
+      if (zStart > zFar) break; // Clip if too far
+
+      // Calculate 4 corners of the cell
+      const p1 = project(cellLeftX, zStart);  // Front-Left
+      const p2 = project(cellRightX, zStart); // Front-Right
+      const p3 = project(cellRightX, zEnd);   // Back-Right
+      const p4 = project(cellLeftX, zEnd);    // Back-Left
+
+      let sleeperClass = 'sleeper-cell';
+      if (currentPlatform && parseInt(currentPlatform) === platformNum) {
+        sleeperClass += ' active-platform-sleeper';
+      }
+
+      // Render as polygon to ensure correct perspective (trapezoid shape)
+      svgContent += `<polygon points="${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}" class="${sleeperClass}" />`;
     }
+
+    // Platform Label (at the bottom)
+    svgContent += `<text x="${(pStartLeft.x + pStartRight.x) / 2}" y="${height - 10}" class="platform-label" text-anchor="middle">${platformNum}</text>`;
   }
 
   // Title
-  const title = `<text x="${chartWidth / 2}" y="20" text-anchor="middle" font-family="'Courier New', monospace" font-size="16" font-weight="bold" fill="#000">Platform Usage: ${dayOfWeek} ${std}</text>`;
+  const title = `<text x="${width / 2}" y="40" text-anchor="middle" class="chart-title">Platform Usage: ${dayOfWeek} ${std}</text>`;
+  const subtitle = `<text x="${width / 2}" y="65" text-anchor="middle" class="chart-subtitle">Total days observed: ${platformCounts.reduce((sum, item) => sum + item.count, 0)}</text>`;
 
-  // Subtitle with total days
-  const totalDays = platformCounts.reduce((sum, item) => sum + item.count, 0);
-  const subtitle = `<text x="${chartWidth / 2}" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="12" fill="#666">Total days observed: ${totalDays}</text>`;
-
-  return `<svg width="${chartWidth}" height="${chartHeight}" xmlns="http://www.w3.org/2000/svg">
+  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
     <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+        <feMerge>
+          <feMergeNode in="coloredBlur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
       <style type="text/css">
         <![CDATA[
-        .train-car { fill: #2c3e50; stroke: #000; stroke-width: 1; }
-        .train-car:nth-child(odd) { fill: #34495e; }
-        .train-car:nth-child(even) { fill: #2c3e50; }
-        .train-coupling { fill: #7f8c8d; stroke: #000; stroke-width: 0.5; }
-        .platform-bar { fill: #000; }
-        .platform-bar.has-train { fill: #f8f9fa; stroke: #dee2e6; stroke-width: 1; }
-        .train-head { fill: #e74c3c; stroke: #c0392b; stroke-width: 1; }
-        .train-icon { animation: trainPulse 3s ease-in-out infinite alternate; }
-        @keyframes trainPulse { 0% { opacity: 0.9; } 100% { opacity: 1; } }
+        .track-line { stroke: #FFFFFF; stroke-width: 1; filter: url(#glow); opacity: 0.3; }
+        .sleeper-line { stroke: #FFFFFF; stroke-linecap: butt; }
+        .sleeper-cell { fill: #FFFFFF; } /* Matrix cell: Filled polygon */
+        .active-platform-sleeper { fill: #FFFFFF; }
+        .platform-label { fill: #666; font-family: 'Courier New', monospace; font-size: 12px; }
+        .chart-title { fill: #FFF; font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; letter-spacing: 2px; }
+        .chart-subtitle { fill: #999; font-family: 'Courier New', monospace; font-size: 12px; }
         ]]>
       </style>
     </defs>
+    <rect width="100%" height="100%" fill="#000000" />
     ${title}
     ${subtitle}
-    ${labels}
-    ${bars}
-    ${trainIcon}
+    ${svgContent}
   </svg>`;
 }
 
