@@ -29,7 +29,8 @@
 
     <main>
         <!-- Static header text - never changes -->
-        <div class="text-header margin-bottom-small">Next train
+        <!-- Static header text - updated by JS -->
+        <div id="header-text" class="text-header margin-bottom-small">Next train
             from Paddington to Tilehurst departs at</div>
 
         <!-- Platform chart container (Promoted to top) -->
@@ -87,9 +88,12 @@
                     // Choose the time to display: expected if provided and not "On time", otherwise scheduled
                     const departTime = service.etd && service.etd !== 'On time' ? service.etd : service.std;
 
-                    // Build simplified display showing the exact departure time (no countdown)
+                    // Update header with time
+                    const headerText = document.getElementById('header-text');
+                    headerText.innerHTML = `Next train from Paddington to Tilehurst departs at <span class="text-highlight">${departTime || '--:--'}</span>`;
+
+                    // Build simplified display (removed large time)
                     display.innerHTML = `
-                            <div class="text-large">${departTime || '--:--'}</div>
                             ${service.platform ? `<div class="text-platform">Platform: ${service.platform}</div>` : ''}
                             ${service.isCancelled ? '<div class="status-cancelled">CANCELLED</div>' : ''}
                             ${service.delayReason ? `<div class="status-delay-reason">Delay reason: ${service.delayReason}</div>` : ''}

@@ -480,8 +480,9 @@ function generatePlatformChart(platformCounts, dayOfWeek, std, currentPlatform =
   }
 
   // Title
-  const title = `<text x="${width / 2}" y="40" text-anchor="middle" class="chart-title">Platform Usage: ${dayOfWeek} ${std}</text>`;
-  const subtitle = `<text x="${width / 2}" y="65" text-anchor="middle" class="chart-subtitle">Total days observed: ${platformCounts.reduce((sum, item) => sum + item.count, 0)}</text>`;
+  const title = `<text x="${width / 2}" y="35" text-anchor="middle" class="chart-title">Platform Usage</text>`;
+  const timeLabel = `<text x="${width / 2}" y="60" text-anchor="middle" class="chart-subtitle" style="font-size: 14px; fill: #FFF;">${dayOfWeek} ${std}</text>`;
+  const subtitle = `<text x="${width / 2}" y="80" text-anchor="middle" class="chart-subtitle">Total days observed: ${platformCounts.reduce((sum, item) => sum + item.count, 0)}</text>`;
 
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -506,6 +507,7 @@ function generatePlatformChart(platformCounts, dayOfWeek, std, currentPlatform =
     </defs>
     <rect width="100%" height="100%" fill="#000000" />
     ${title}
+    ${timeLabel}
     ${subtitle}
     ${svgContent}
   </svg>`;
