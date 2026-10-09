@@ -274,7 +274,7 @@ app.get('/api/next-train-chart/:from/:to', async (req, res) => {
     }
 
     // Generate SVG chart
-    const svg = generatePlatformChart(platformCounts, dayOfWeek, std, currentPlatform);
+    const svg = renderPlatformChart(req.query.theme, platformCounts, dayOfWeek, std, currentPlatform);
 
     res.setHeader('Content-Type', 'image/svg+xml');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); // Ensure no caching
@@ -313,14 +313,14 @@ app.get('/api/service-chart/:dayOfWeek/:std/:destination?', (req, res) => {
     if (!platformCounts || platformCounts.length === 0) {
       // Return a chart showing no platform data instead of 404
       const emptyPlatformCounts = [];
-      const svg = generatePlatformChart(emptyPlatformCounts, dayOfWeek, std, null);
+      const svg = renderPlatformChart(req.query.theme, emptyPlatformCounts, dayOfWeek, std, null);
       res.setHeader('Content-Type', 'image/svg+xml');
       res.send(svg);
       return;
     }
 
     // Generate SVG chart (no current platform since this is historical data)
-    const svg = generatePlatformChart(platformCounts, dayOfWeek, std, null);
+    const svg = renderPlatformChart(req.query.theme, platformCounts, dayOfWeek, std, null);
 
     res.setHeader('Content-Type', 'image/svg+xml');
     res.send(svg);
@@ -366,6 +366,14 @@ app.listen(PORT, '0.0.0.0', () => {
 // setInterval(() => {
 //   trainDB.cleanupOldRecords();
 // }, 12 * 60 * 60 * 1000); // 12 hours
+
+// Pick the chart style from the ?theme= query parameter (defaults to Kraftwerk)
+function renderPlatformChart(theme, platformCounts, dayOfWeek, std, currentPlatform = null) {
+  if (theme === 'classic') {
+    return generateClassicPlatformChart(platformCounts, dayOfWeek, std, currentPlatform);
+  }
+  return generatePlatformChart(platformCounts, dayOfWeek, std, currentPlatform);
+}
 
 // Generate SVG chart for platform distribution (Kraftwerk Style)
 function generatePlatformChart(platformCounts, dayOfWeek, std, currentPlatform = null) {
@@ -510,6 +518,105 @@ function generatePlatformChart(platformCounts, dayOfWeek, std, currentPlatform =
     ${timeLabel}
     ${subtitle}
     ${svgContent}
+  </svg>`;
+}
+
+// Generate SVG chart for platform distribution (Classic Style, restored from 93c6e69)
+function generateClassicPlatformChart(platformCounts, dayOfWeek, std, currentPlatform = null) {
+  // Create a map of platform counts for easy lookup
+  const platformMap = {};
+  platformCounts.forEach(item => {
+    platformMap[item.platform] = item.count;
+  });
+
+  // Find the maximum count for scaling
+  const maxCount = Math.max(...platformCounts.map(item => item.count), 1);
+
+  // Chart dimensions - vertical layout
+  const chartWidth = 800;
+  const chartHeight = 300;
+  const barWidth = 40;
+  const barSpacing = 10;
+  const leftMargin = 60;
+  const rightMargin = 60;
+  const topMargin = 60;
+  const bottomMargin = 40;
+
+  // Calculate available height for bars
+  const availableHeight = chartHeight - topMargin - bottomMargin;
+
+  // Generate bars for all 14 platforms
+  let bars = '';
+  let labels = '';
+  let trainIcon = '';
+
+  for (let platform = 1; platform <= 14; platform++) {
+    const count = platformMap[platform] || 0;
+    const barHeight = (count / maxCount) * availableHeight;
+    const x = leftMargin + (platform - 1) * (barWidth + barSpacing);
+    const isCurrentPlatform = currentPlatform && parseInt(currentPlatform) === platform;
+
+    // Platform label - centered below the bar
+    labels += `<text x="${x + barWidth / 2}" y="${chartHeight - 10}" text-anchor="middle" font-family="'Courier New', monospace" font-size="14" fill="#000">${platform}</text>`;
+
+    // Bar background (light gray) - drawn from bottom up
+    const barClass = isCurrentPlatform ? 'platform-bar has-train' : 'platform-bar';
+    bars += `<rect x="${x}" y="${chartHeight - bottomMargin - availableHeight}" width="${barWidth}" height="${availableHeight}" fill="#f0f0f0" stroke="#ddd" stroke-width="1"/>`;
+
+    // Bar fill (black) - drawn from bottom up
+    bars += `<rect class="${barClass}" x="${x}" y="${chartHeight - bottomMargin - barHeight}" width="${barWidth}" height="${barHeight}" fill="#000"/>`;
+
+    // Count label - centered above the bar
+    bars += `<text x="${x + barWidth / 2}" y="${chartHeight - bottomMargin - barHeight - 5}" text-anchor="middle" font-family="'Courier New', monospace" font-size="12" fill="#666">${count}</text>`;
+
+    // Add train icon if this is the current platform
+    if (isCurrentPlatform) {
+      const trainX = x + barWidth / 2;
+      const trainY = chartHeight - bottomMargin - barHeight - 25;
+
+      trainIcon += `
+        <g class="train-icon">
+          <!-- Train head -->
+          <rect class="train-head" x="${trainX - 8}" y="${trainY}" width="16" height="8" rx="2"/>
+          <!-- Train car 1 -->
+          <rect class="train-car" x="${trainX - 6}" y="${trainY + 8}" width="12" height="6"/>
+          <!-- Train coupling -->
+          <rect class="train-coupling" x="${trainX - 1}" y="${trainY + 14}" width="2" height="2"/>
+          <!-- Train car 2 -->
+          <rect class="train-car" x="${trainX - 6}" y="${trainY + 16}" width="12" height="6"/>
+        </g>
+      `;
+    }
+  }
+
+  // Title
+  const title = `<text x="${chartWidth / 2}" y="20" text-anchor="middle" font-family="'Courier New', monospace" font-size="16" font-weight="bold" fill="#000">Platform Usage: ${dayOfWeek} ${std}</text>`;
+
+  // Subtitle with total days
+  const totalDays = platformCounts.reduce((sum, item) => sum + item.count, 0);
+  const subtitle = `<text x="${chartWidth / 2}" y="35" text-anchor="middle" font-family="'Courier New', monospace" font-size="12" fill="#666">Total days observed: ${totalDays}</text>`;
+
+  return `<svg width="${chartWidth}" height="${chartHeight}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <style type="text/css">
+        <![CDATA[
+        .train-car { fill: #2c3e50; stroke: #000; stroke-width: 1; }
+        .train-car:nth-child(odd) { fill: #34495e; }
+        .train-car:nth-child(even) { fill: #2c3e50; }
+        .train-coupling { fill: #7f8c8d; stroke: #000; stroke-width: 0.5; }
+        .platform-bar { fill: #000; }
+        .platform-bar.has-train { fill: #f8f9fa; stroke: #dee2e6; stroke-width: 1; }
+        .train-head { fill: #e74c3c; stroke: #c0392b; stroke-width: 1; }
+        .train-icon { animation: trainPulse 3s ease-in-out infinite alternate; }
+        @keyframes trainPulse { 0% { opacity: 0.9; } 100% { opacity: 1; } }
+        ]]>
+      </style>
+    </defs>
+    ${title}
+    ${subtitle}
+    ${labels}
+    ${bars}
+    ${trainIcon}
   </svg>`;
 }
 

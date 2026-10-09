@@ -12,6 +12,47 @@
     /* Luminous green */
     --error: #f00;
     /* Luminous red */
+    --bg: #000;
+    --bg-card: #050505;
+    --highlight: #fff;
+    --link: var(--text);
+    --link-underline: var(--text-tertiary);
+    --link-hover: #fff;
+    --card-link: var(--text-secondary);
+    --card-hover-border: #fff;
+    --glow-large: 0 0 10px rgba(255, 255, 255, 0.5);
+    --glow-header: 0 0 8px rgba(255, 255, 255, 0.6);
+    --glow-highlight: 0 0 15px rgba(255, 255, 255, 0.9), 0 0 25px rgba(255, 255, 255, 0.7);
+    --glow-link: 0 0 5px #fff;
+    --glow-error: 0 0 5px var(--error);
+    --glow-success: 0 0 5px var(--success);
+}
+
+/* Classic theme (pre-Kraftwerk look), enabled with ?theme=classic */
+:root[data-theme="classic"] {
+    --primary: #007bff;
+    --text: #000;
+    --text-secondary: #666;
+    --text-tertiary: #999;
+    --text-dark: #333;
+    --bg-light: #f5f5f5;
+    --border: #ddd;
+    --success: green;
+    --error: red;
+    --bg: #fff;
+    --bg-card: #fff;
+    --highlight: #000;
+    --link: var(--primary);
+    --link-underline: currentColor;
+    --link-hover: var(--primary);
+    --card-link: var(--primary);
+    --card-hover-border: var(--border);
+    --glow-large: none;
+    --glow-header: none;
+    --glow-highlight: none;
+    --glow-link: none;
+    --glow-error: none;
+    --glow-success: none;
 }
 
 body {
@@ -19,7 +60,7 @@ body {
     min-height: 100vh;
     min-height: 100dvh;
     font-family: var(--font);
-    background: #000;
+    background: var(--bg);
     color: var(--text);
 }
 
@@ -38,22 +79,22 @@ main {
     min-height: 120px;
     display: flex;
     align-items: center;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    text-shadow: var(--glow-large);
 }
 
 .text-header {
     font-size: 24px;
     color: var(--text-secondary);
     margin: 0 0 20px 0;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+    text-shadow: var(--glow-header);
     /* Added glow to header */
 }
 
 .text-highlight {
-    color: #FFF;
+    color: var(--highlight);
     font-weight: bold;
     font-size: 1.2em;
-    text-shadow: 0 0 15px rgba(255, 255, 255, 0.9), 0 0 25px rgba(255, 255, 255, 0.7);
+    text-shadow: var(--glow-highlight);
     /* Intense glow */
 }
 
@@ -82,15 +123,15 @@ main {
 
 a.link,
 a.link-large {
-    color: var(--text);
+    color: var(--link);
     text-decoration: underline;
-    text-decoration-color: var(--text-tertiary);
+    text-decoration-color: var(--link-underline);
 }
 
 a.link:hover,
 a.link-large:hover {
-    color: #fff;
-    text-shadow: 0 0 5px #fff;
+    color: var(--link-hover);
+    text-shadow: var(--glow-link);
 }
 
 .link-large {
@@ -100,12 +141,12 @@ a.link-large:hover {
 .status-cancelled {
     color: var(--error);
     font-weight: bold;
-    text-shadow: 0 0 5px var(--error);
+    text-shadow: var(--glow-error);
 }
 
 .status-on-time {
     color: var(--success);
-    text-shadow: 0 0 5px var(--success);
+    text-shadow: var(--glow-success);
 }
 
 .status-delay-reason {
@@ -140,7 +181,7 @@ a.link-large:hover {
     /* Added spacing below chart */
     display: block;
     /* Visible by default */
-    background: #000;
+    background: var(--bg);
     min-height: 200px;
     /* Reserve space */
 }
@@ -217,7 +258,7 @@ a.link-large:hover {
     padding: 8px;
     font-size: 14px;
     border: 1px solid var(--border);
-    background: #000;
+    background: var(--bg);
     color: var(--text);
 }
 
@@ -256,12 +297,12 @@ a.link-large:hover {
     padding: 10px;
     cursor: pointer;
     transition: background-color 0.2s, border-color 0.2s;
-    background: #050505;
+    background: var(--bg-card);
 }
 
 .service-card:hover {
     background-color: var(--bg-light);
-    border-color: #fff;
+    border-color: var(--card-hover-border);
 }
 
 .service-card-time {
@@ -281,7 +322,7 @@ a.link-large:hover {
 }
 
 .service-card-link {
-    color: var(--text-secondary);
+    color: var(--card-link);
     font-size: 10px;
     margin-top: 5px;
 }
