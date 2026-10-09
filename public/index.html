@@ -22,6 +22,13 @@
 -->
 
 <head>
+    <script>
+        // Theme from ?theme= (only 'classic' is recognised; default is Kraftwerk).
+        // Set before the stylesheet loads to avoid a flash of the default theme.
+        const THEME = new URLSearchParams(window.location.search).get('theme') === 'classic' ? 'classic' : '';
+        const THEME_QUERY = THEME ? `?theme=${THEME}` : '';
+        if (THEME) document.documentElement.dataset.theme = THEME;
+    </script>
     <link rel="stylesheet" href="/styles.css">
 </head>
 
@@ -152,7 +159,7 @@
                 chartContent.style.display = 'none';
 
                 // Fetch the SVG chart from the server
-                const response = await fetch('/api/next-train-chart/PAD/TLH');
+                const response = await fetch(`/api/next-train-chart/PAD/TLH${THEME_QUERY}`);
 
                 if (!response.ok) {
                     throw new Error(`Chart request failed: ${response.status}`);
@@ -697,7 +704,7 @@
 
             try {
                 // Fetch the SVG chart from the server (same as main page)
-                const response = await fetch(`/api/service-chart/${dayOfWeek}/${scheduledTime}/${destination}`);
+                const response = await fetch(`/api/service-chart/${dayOfWeek}/${scheduledTime}/${destination}${THEME_QUERY}`);
 
                 if (!response.ok) {
                     throw new Error(`Chart request failed: ${response.status}`);
